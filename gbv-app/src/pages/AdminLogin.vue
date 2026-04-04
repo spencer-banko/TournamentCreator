@@ -31,18 +31,18 @@ async function signIn(e: Event) {
 
 <template>
   <section class="min-h-dvh w-full">
-    <div class="min-h-dvh w-full flex items-center justify-center px-4 py-6 bg-gbv-blue">
+    <div class="min-h-dvh w-full flex items-center justify-center px-4 py-6 bg-black">
       <div class="w-full max-w-xl">
         <div class="text-center">
           <div class="flex flex-col items-center mb-8">
             <img
               src="@/assets/GBVLogo.png"
-              alt="GBV Logo"
+              alt="GTBV Logo"
               class="w-[68vw] sm:w-[60vw] md:w-[48vw] max-w-[512px] h-auto max-h-[32vh] drop-shadow-xl"
             />
             <img
               src="@/assets/GatorBeachVolleyball.png"
-              alt="Gator Beach Volleyball"
+              alt="GT Beach Volleyball"
               class="w-[68vw] sm:w-[60vw] md:w-[48vw] max-w-[512px] h-auto mt-4 drop-shadow-xl"
             />
           </div>

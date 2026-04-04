@@ -350,7 +350,10 @@ async function saveTournament() {
       toForm(t);
     }
   } catch (err: any) {
-    toast.add({ severity: 'error', summary: 'Save failed', detail: err?.message ?? 'Unknown error', life: 3500 });
+    const hint = [err?.code, err?.details, err?.hint].filter(Boolean).join(' — ');
+    const detail = hint ? `${err?.message ?? 'Unknown error'} (${hint})` : (err?.message ?? 'Unknown error');
+    toast.add({ severity: 'error', summary: 'Save failed', detail, life: 6000 });
+    console.error('[AdminTournamentSetup] saveTournament', err);
   } finally {
     saving.value = false;
   }
@@ -452,7 +455,7 @@ onMounted(async () => {
             </div>
             <div>
               <label class="block text-sm mb-2">Access Code</label>
-              <InputText v-model="form.access_code" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="GATORS2025" />
+              <InputText v-model="form.access_code" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="GOJACKETS2025" />
             </div>
             <div>
               <label class="block text-sm mb-2">Status</label>

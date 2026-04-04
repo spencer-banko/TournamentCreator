@@ -118,19 +118,19 @@ async function saveCode() {
   <!-- Hero Login (Access Code) -->
   <section v-if="!session.accessCode" class="min-h-dvh w-full">
     <div
-      class="min-h-dvh w-full flex items-center justify-center px-4 py-12 gbv-grad-green"
+      class="min-h-dvh w-full flex items-center justify-center px-4 py-12 bg-black"
     >
       <div class="w-full max-w-xl">
         <div class="text-center">
               <div class="flex flex-col items-center mb-8">
               <img 
                 src="@/assets/GBVLogo.png"
-                alt="GBV Logo"
+                alt="GTBV Logo"
                 class="w-[68vw] sm:w-[60vw] md:w-[48vw] max-w-[512px] h-auto max-h-[32vh] drop-shadow-xl"
               />
               <img
                 src="@/assets/GatorBeachVolleyball.png"
-                alt="Gator Beach Volleyball"
+                alt="GT Beach Volleyball"
                 class="w-[68vw] sm:w-[60vw] md:w-[48vw] max-w-[512px] h-auto mt-4 drop-shadow-xl"
               />
               </div>
@@ -144,7 +144,7 @@ async function saveCode() {
           <div class="flex flex-col sm:flex-row gap-3">
             <InputText
               v-model="accessCodeInput"
-              placeholder="e.g. GOGATORS"
+              placeholder="e.g. GOJACKETS"
               class="w-full !rounded-2xl !px-5 !py-4 !text-xl !bg-white/95 !shadow-lg text-gray-900"
             />
             <Button

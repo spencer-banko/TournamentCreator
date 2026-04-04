@@ -1,29 +1,33 @@
 <script setup lang="ts">
 import Toast from 'primevue/toast';
 import { watchEffect } from 'vue';
-import { useRoute } from 'vue-router';
-
-const route = useRoute();
 
 watchEffect(() => {
   if (typeof document === 'undefined') return;
   const body = document.body;
   const html = document.documentElement;
 
-  const managed = ['bg-gbv-bg', 'bg-white', 'bg-gbv-blue', 'gbv-grad-green', 'text-white', 'text-slate-800'];
+  const managed = [
+    'bg-gbv-bg',
+    'bg-white',
+    'bg-gbv-blue',
+    'gbv-grad-green',
+    'bg-black',
+    'text-white',
+    'text-slate-800',
+  ];
   for (const c of managed) {
     body.classList.remove(c);
     html.classList.remove(c);
   }
 
-  const isAdmin = !!route.meta.blueLayout;
-  const pageClasses = isAdmin ? ['bg-gbv-blue', 'text-white'] : ['gbv-grad-green', 'text-white'];
+  const pageClasses = ['bg-black', 'text-white'];
   for (const c of pageClasses) {
     body.classList.add(c);
     html.classList.add(c);
   }
 
-  const themeColor = isAdmin ? '#2d51a6' : '#1b6a08';
+  const themeColor = '#000000';
   let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
   if (!meta) {
     meta = document.createElement('meta');
@@ -35,12 +39,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div
-    class="min-h-full min-h-dvh flex flex-col"
-    :class="[
-      $route.meta.blueLayout ? 'bg-gbv-blue text-white' : 'gbv-grad-green text-white'
-    ]"
-  >
+  <div class="min-h-full min-h-dvh flex flex-col bg-black text-white">
     <Toast />
 
     <header
@@ -49,7 +48,7 @@ watchEffect(() => {
     >
       <div class="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
         <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">
-          Gator Beach Volleyball
+          GT Beach Volleyball
         </h1>
       </div>
     </header>
@@ -63,7 +62,7 @@ watchEffect(() => {
       :class="$route.meta.blueLayout ? 'border-t border-white/15 text-sm text-white/80 bg-transparent' : 'border-t border-white/15 text-sm text-white/80 bg-transparent'"
     >
       <div class="mx-auto max-w-6xl px-4 py-4">
-        © 2025 Gator Beach Volleyball
+        © 2025 GT Beach Volleyball
       </div>
     </footer>
   </div>

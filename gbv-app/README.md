@@ -1,4 +1,4 @@
-# Gator Beach Volleyball Tournament App
+# GT Beach Volleyball Tournament App
 
 Mobile-first tournament management web application for grab-bag style beach volleyball events.
 

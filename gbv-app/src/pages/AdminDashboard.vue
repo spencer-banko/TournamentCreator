@@ -232,7 +232,7 @@ onMounted(() => {
             <label class="text-sm font-semibold text-white">Access Code</label>
             <InputText
               v-model="accessCode"
-              placeholder="e.g. FALL25"
+              placeholder="e.g. GOJACKETS"
               class="w-44 !rounded-xl !px-3 !py-2 bg-white/95 text-gray-900"
               :disabled="loadingTournament"
             />

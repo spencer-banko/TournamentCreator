@@ -13,7 +13,7 @@ const session = useSessionStore();
 
 const accessCode = computed(() => (route.params.accessCode as string) ?? session.accessCode ?? '');
 const hasCode = computed(() => !!accessCode.value);
-const tournamentName = computed(() => session.tournament?.name || 'Gator Beach Volleyball');
+const tournamentName = computed(() => session.tournament?.name || 'GT Beach Volleyball');
 const tournamentPhase = computed(() => {
   const st = session.tournament?.status;
   if (!st) return null;
@@ -165,12 +165,12 @@ onBeforeUnmount(() => {
       :class="stickyHeader ? 'sticky top-0 z-50' : ''"
       aria-label="Public tournament header"
     >
-      <div class="gbv-grad-green text-white shadow-md">
+      <div class="bg-black text-white shadow-md border-b border-white/10">
         <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
             <img
               src="@/assets/GBVLogo.png"
-              alt="GBV"
+              alt="GTBV"
               class="h-8 w-auto drop-shadow-md"
             />
             <div class="min-w-0">

@@ -258,7 +258,7 @@ onMounted(async () => {
           <label class="block text-sm mb-2">Tournament Access Code</label>
           <input
             v-model="accessCode"
-            placeholder="e.g. GATORS2025"
+            placeholder="e.g. GOJACKETS2025"
             class="w-full rounded-xl border border-white/30 bg-white px-4 py-3 text-slate-900"
           />
         </div>

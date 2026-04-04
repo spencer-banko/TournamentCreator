@@ -175,7 +175,7 @@ async function runGenerate() {
           <label class="block text-sm mb-2">Tournament Access Code</label>
           <InputText
             v-model="accessCode"
-            placeholder="e.g. GATORS2025"
+            placeholder="e.g. GOJACKETS2025"
             class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900"
           />
         </div>

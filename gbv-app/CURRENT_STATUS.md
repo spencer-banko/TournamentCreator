@@ -1,4 +1,4 @@
-# Gator Beach Volleyball Tournament App — Current Status and Implementation Plan
+# GT Beach Volleyball Tournament App — Current Status and Implementation Plan
 
 Source of truth: Product Requirements at [PRD.md](PRD.md)
 
