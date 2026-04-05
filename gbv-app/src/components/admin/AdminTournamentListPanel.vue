@@ -5,7 +5,7 @@ import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-import Button from 'primevue/button';
+import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import supabase from '../../lib/supabase';
 import { useSessionStore } from '../../stores/session';
 import type { Tournament } from '../../types/db';
@@ -136,116 +136,165 @@ defineExpose({ loadTournaments, getTournaments });
   <div
     :class="[
       variant === 'dashboard'
-        ? 'admin-tournament-list-panel--dashboard px-4 sm:px-5'
+        ? 'admin-tournament-list-panel--dashboard px-1 sm:px-2'
         : 'admin-tournament-list-panel--setup px-1 sm:px-2',
     ]"
   >
     <DataTable
       :value="tournaments"
-      :size="variant === 'dashboard' ? 'small' : undefined"
       scrollable
       :scrollHeight="variant === 'dashboard' ? '22rem' : '32rem'"
-      class="admin-tournament-datatable rounded-xl border border-white/10"
+      :class="[
+        'admin-tournament-datatable rounded-xl border',
+        variant === 'dashboard' || variant === 'setup'
+          ? 'border-slate-600/40 bg-slate-800/35'
+          : 'border-white/10',
+      ]"
       :loading="loading || deleting"
-      :tableClass="variant === 'dashboard' ? '!text-sm' : '!text-base'"
+      tableClass="!text-base"
       :pt="{
         table: { class: 'bg-transparent' },
-        thead: { class: 'bg-white/10 text-white' },
-        tbody: { class: 'text-white/90' },
+        thead: {
+          class:
+            variant === 'dashboard' || variant === 'setup'
+              ? 'bg-slate-800/95 text-slate-200'
+              : 'bg-white/10 text-white',
+        },
+        tbody: {
+          class: variant === 'dashboard' || variant === 'setup' ? 'text-slate-200' : 'text-white/90',
+        },
       }"
     >
       <!-- Dashboard: # | Date | Name | Access code | Actions -->
       <template v-if="variant === 'dashboard'">
-        <Column header="#" headerClass="!bg-white/10 !text-white" style="width: 2.75rem">
+        <Column
+          header="#"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          style="width: 2.75rem"
+        >
           <template #body="{ index }">
-            <span class="text-white/90 tabular-nums">{{ (index as number) + 1 }}</span>
+            <span class="text-base tabular-nums text-slate-400">{{ (index as number) + 1 }}</span>
           </template>
         </Column>
-        <Column field="date" header="Date" headerClass="!bg-white/10 !text-white" style="width: 7.5rem">
+        <Column
+          field="date"
+          header="Date"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          style="width: 8.5rem"
+        >
           <template #body="{ data }">
-            <span class="font-medium text-white">{{ (data as Tournament).date }}</span>
+            <span class="text-base font-semibold text-white">{{ (data as Tournament).date }}</span>
           </template>
         </Column>
-        <Column field="name" header="Name" headerClass="!bg-white/10 !text-white">
+        <Column
+          field="name"
+          header="Name"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+        >
           <template #body="{ data }">
-            <div class="font-medium">{{ (data as Tournament).name }}</div>
-            <div class="text-xs text-white/75">{{ (data as Tournament).status }}</div>
+            <div class="text-lg font-semibold leading-snug text-white">{{ (data as Tournament).name }}</div>
           </template>
         </Column>
-        <Column field="access_code" header="Access code" headerClass="!bg-white/10 !text-white" style="width: 9rem">
+        <Column
+          field="access_code"
+          header="Access code"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          style="width: 10rem"
+        >
           <template #body="{ data }">
-            <span class="font-mono text-sm text-white/95">{{ (data as Tournament).access_code }}</span>
+            <span class="font-mono text-base font-medium text-white">{{ (data as Tournament).access_code }}</span>
           </template>
         </Column>
-        <Column header="Actions" style="width: 11.5rem" headerClass="!bg-white/10 !text-white">
+        <Column
+          header="Actions"
+          style="width: 8rem"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+        >
           <template #body="{ data }">
-            <div class="flex flex-wrap gap-1">
-              <Button
-                label="View"
-                size="small"
-                text
-                class="!text-white !px-1"
+            <div class="flex items-center justify-center gap-1">
+              <button
+                type="button"
+                class="dashboard-row-action"
+                aria-label="View tournament"
                 :disabled="deleting"
                 @click="viewTournament(data as Tournament)"
-              />
-              <Button
-                label="Edit"
-                size="small"
-                text
-                class="!text-white !px-1"
+              >
+                <EyeIcon class="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                class="dashboard-row-action"
+                aria-label="Edit tournament"
                 :disabled="deleting"
                 @click="editTournament(data as Tournament)"
-              />
-              <Button
-                label="Delete"
-                size="small"
-                text
-                severity="danger"
-                class="!px-1"
+              >
+                <PencilSquareIcon class="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                class="dashboard-row-action dashboard-row-action--danger"
+                aria-label="Delete tournament"
                 :disabled="deleting"
                 @click="requestDeleteTournament(data as Tournament)"
-              />
+              >
+                <TrashIcon class="h-6 w-6" />
+              </button>
             </div>
           </template>
         </Column>
       </template>
 
-      <!-- Setup: Name (detail) | Actions -->
+      <!-- Setup: Date | Name | Actions (same visual language as dashboard) -->
       <template v-else>
-        <Column field="name" header="Name" headerClass="!bg-white/10 !text-white">
+        <Column
+          field="date"
+          header="Date"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          style="width: 8.5rem"
+        >
           <template #body="{ data }">
-            <div class="font-medium leading-snug">{{ (data as Tournament).name }}</div>
-            <div class="mt-1 text-sm text-white/80">{{ (data as Tournament).date }} · {{ (data as Tournament).status }}</div>
+            <span class="text-base font-semibold text-white">{{ (data as Tournament).date }}</span>
           </template>
         </Column>
-        <Column header="Actions" style="width: 11.5rem" headerClass="!bg-white/10 !text-white">
+        <Column field="name" header="Name" headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50">
           <template #body="{ data }">
-            <div class="flex flex-wrap gap-1">
-              <Button
-                label="View"
-                size="small"
-                text
-                class="!text-white !px-1"
+            <div class="text-lg font-semibold leading-snug text-white">{{ (data as Tournament).name }}</div>
+          </template>
+        </Column>
+        <Column
+          header="Actions"
+          style="width: 8rem"
+          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+        >
+          <template #body="{ data }">
+            <div class="flex items-center justify-center gap-1">
+              <button
+                type="button"
+                class="dashboard-row-action"
+                aria-label="View tournament"
                 :disabled="deleting"
                 @click="viewTournament(data as Tournament)"
-              />
-              <Button
-                label="Edit"
-                size="small"
-                text
-                class="!text-white !px-1"
+              >
+                <EyeIcon class="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                class="dashboard-row-action"
+                aria-label="Edit tournament"
                 :disabled="deleting"
                 @click="editTournament(data as Tournament)"
-              />
-              <Button
-                label="Delete"
-                size="small"
-                text
-                severity="danger"
-                class="!px-1"
+              >
+                <PencilSquareIcon class="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                class="dashboard-row-action dashboard-row-action--danger"
+                aria-label="Delete tournament"
                 :disabled="deleting"
                 @click="requestDeleteTournament(data as Tournament)"
-              />
+              >
+                <TrashIcon class="h-6 w-6" />
+              </button>
             </div>
           </template>
         </Column>
@@ -259,46 +308,77 @@ defineExpose({ loadTournaments, getTournaments });
   scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.06);
 }
 
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-thead > tr > th) {
-  padding-left: 1.125rem;
-  padding-right: 0.75rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-}
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr > td) {
+.admin-tournament-list-panel--dashboard :deep(.p-datatable-thead > tr > th),
+.admin-tournament-list-panel--setup :deep(.p-datatable-thead > tr > th) {
   padding-left: 1.125rem;
   padding-right: 0.75rem;
   padding-top: 1rem;
   padding-bottom: 1rem;
+  border-bottom: 1px solid rgb(51 65 85 / 0.45);
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr > td),
+.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr > td) {
+  padding-left: 1.125rem;
+  padding-right: 0.75rem;
+  padding-top: 1.125rem;
+  padding-bottom: 1.125rem;
   vertical-align: middle;
+  border-color: rgb(51 65 85 / 0.35);
+  transition: background-color 0.15s ease;
+}
+.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr:hover > td),
+.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr:hover > td) {
+  background-color: rgb(30 41 59 / 0.45) !important;
 }
 .admin-tournament-list-panel--dashboard :deep(.p-datatable-thead > tr > th:first-child),
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr > td:first-child) {
-  padding-left: 1.25rem;
-}
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr + tr > td) {
-  border-top-color: rgba(255, 255, 255, 0.12);
-}
-
-/* Setup: taller rows + more vertical rhythm; first column inset from table edge */
-.admin-tournament-list-panel--setup :deep(.p-datatable-thead > tr > th) {
-  padding-top: 0.875rem;
-  padding-bottom: 0.875rem;
-  padding-left: 1.125rem;
-  padding-right: 0.75rem;
-}
-.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr > td) {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  padding-left: 1.125rem;
-  padding-right: 0.75rem;
-  vertical-align: middle;
-}
+.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr > td:first-child),
 .admin-tournament-list-panel--setup :deep(.p-datatable-thead > tr > th:first-child),
 .admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr > td:first-child) {
-  padding-left: 1.5rem;
+  padding-left: 1.25rem;
 }
+.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr + tr > td),
 .admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr + tr > td) {
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-color: rgb(51 65 85 / 0.35);
+}
+
+.admin-tournament-list-panel--dashboard .dashboard-row-action,
+.admin-tournament-list-panel--setup .dashboard-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.375rem;
+  color: rgb(148 163 184);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.admin-tournament-list-panel--dashboard .dashboard-row-action:focus-visible,
+.admin-tournament-list-panel--setup .dashboard-row-action:focus-visible {
+  outline: 2px solid rgb(251 191 36 / 0.55);
+  outline-offset: 2px;
+}
+.admin-tournament-list-panel--dashboard .dashboard-row-action--danger:focus-visible,
+.admin-tournament-list-panel--setup .dashboard-row-action--danger:focus-visible {
+  outline-color: rgb(248 113 113 / 0.55);
+}
+.admin-tournament-list-panel--dashboard .dashboard-row-action:hover:not(:disabled),
+.admin-tournament-list-panel--setup .dashboard-row-action:hover:not(:disabled) {
+  color: rgb(251 191 36);
+  background-color: rgb(251 191 36 / 0.12);
+}
+.admin-tournament-list-panel--dashboard .dashboard-row-action--danger:hover:not(:disabled),
+.admin-tournament-list-panel--setup .dashboard-row-action--danger:hover:not(:disabled) {
+  color: rgb(248 113 113);
+  background-color: rgb(248 113 113 / 0.12);
+}
+.admin-tournament-list-panel--dashboard .dashboard-row-action:disabled,
+.admin-tournament-list-panel--setup .dashboard-row-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>

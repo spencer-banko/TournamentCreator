@@ -9,6 +9,12 @@ import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
 import { checkPrerequisites, generateSchedule, type GenerateResult } from '../lib/schedule';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
+import {
+  adminBtnPillPt,
+  adminBtnBluePillClass,
+  adminBtnGreenPillClass,
+  adminBtnDangerPillClass,
+} from '@/lib/adminButtonStyles';
 
 const router = useRouter();
 const toast = useToast();
@@ -152,8 +158,10 @@ async function runGenerate() {
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-6">
+  <div class="admin-tool-page -mx-4 min-h-dvh bg-[#0b1120] px-4 py-8 text-slate-100">
+    <div class="mx-auto max-w-6xl">
     <UiSectionHeading
+      variant="dashboard"
       title="Generate Schedule"
       subtitle="Validate prerequisites and generate pool-play matches using schedule templates."
       :divider="true"
@@ -163,16 +171,16 @@ async function runGenerate() {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-white/40 !text-white hover:!bg-white/10"
+        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
         @click="router.push({ name: 'admin-dashboard' })"
       />
     </UiSectionHeading>
 
     <!-- Tournament loader / context -->
-    <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+    <div class="mt-2 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
         <div class="sm:col-span-2">
-          <label class="block text-sm mb-2">Tournament Access Code</label>
+          <label class="mb-2 block text-sm font-medium text-slate-300">Tournament Access Code</label>
           <InputText
             v-model="accessCode"
             placeholder="e.g. GOJACKETS2025"
@@ -184,23 +192,24 @@ async function runGenerate() {
             :loading="loading"
             label="Load Tournament"
             icon="pi pi-search"
-            class="!rounded-xl !px-4 !py-3 border-none text-white gbv-grad-blue"
+            :class="adminBtnBluePillClass"
+            :pt="adminBtnPillPt"
             @click="loadTournamentByAccessCode"
           />
         </div>
       </div>
-      <div v-else class="text-sm">
-        Loaded: <span class="font-semibold">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-white/80">({{ session.accessCode }})</span>
+      <div v-else class="text-sm text-slate-300">
+        Loaded: <span class="font-semibold text-white">{{ session.tournament.name }}</span>
+        <span class="ml-2 text-slate-400">({{ session.accessCode }})</span>
       </div>
     </div>
 
     <div v-if="session.tournament" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
       <!-- Status / actions -->
       <div class="lg:col-span-1">
-        <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
           <div class="flex items-center justify-between">
-            <div class="text-sm">Existing pool matches</div>
+            <div class="text-sm font-medium text-slate-200">Existing pool matches</div>
             <Tag :value="hasMatches ? 'Yes' : 'No'" :severity="hasMatches ? 'warn' : 'success'" />
           </div>
           <div class="mt-4 grid gap-3">
@@ -208,7 +217,8 @@ async function runGenerate() {
               :loading="checking"
               label="Check Prerequisites"
               icon="pi pi-search"
-              class="!rounded-xl border-none text-white gbv-grad-blue"
+              :class="adminBtnBluePillClass"
+              :pt="adminBtnPillPt"
               @click="runPrereqCheck"
             />
             <Button
@@ -216,7 +226,8 @@ async function runGenerate() {
               :loading="generating"
               label="Generate Schedule"
               icon="pi pi-cog"
-              class="!rounded-xl border-none text-white gbv-grad-green"
+              :class="adminBtnGreenPillClass"
+              :pt="adminBtnPillPt"
               @click="runGenerate"
             />
             <Button
@@ -225,7 +236,8 @@ async function runGenerate() {
               label="Delete Existing Pool Matches"
               icon="pi pi-trash"
               severity="danger"
-              class="!rounded-xl"
+              :class="adminBtnDangerPillClass"
+              :pt="adminBtnPillPt"
               @click="deleteExistingPoolMatches"
             />
           </div>
@@ -234,41 +246,42 @@ async function runGenerate() {
 
       <!-- Prereq results and last result -->
       <div class="lg:col-span-2">
-        <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Prerequisite Results</h3>
+            <h3 class="text-lg font-semibold text-white">Prerequisite Results</h3>
             <Tag :value="prereqErrors.length === 0 ? 'OK' : 'Issues'" :severity="prereqErrors.length === 0 ? 'success' : 'warn'" />
           </div>
           <div class="mt-3">
-            <div v-if="prereqErrors.length === 0" class="text-sm text-emerald-200">
+            <div v-if="prereqErrors.length === 0" class="text-sm text-emerald-300/95">
               All prerequisite checks passed. You can generate the schedule.
             </div>
-            <ul v-else class="list-disc list-inside text-sm text-amber-200">
+            <ul v-else class="list-disc list-inside text-sm text-amber-200/95">
               <li v-for="(e, idx) in prereqErrors" :key="idx">{{ e }}</li>
             </ul>
           </div>
         </div>
 
-        <div v-if="lastResult" class="mt-6 rounded-lg border border-white/15 bg-white/5 p-4">
-          <h3 class="text-lg font-semibold">Last Generation Result</h3>
-          <p class="mt-1 text-sm">
-            Inserted: <span class="font-semibold">{{ lastResult.inserted }}</span>
+        <div v-if="lastResult" class="mt-6 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+          <h3 class="text-lg font-semibold text-white">Last Generation Result</h3>
+          <p class="mt-1 text-sm text-slate-300">
+            Inserted: <span class="font-semibold text-white">{{ lastResult.inserted }}</span>
           </p>
           <div v-if="(lastResult.errors || []).length > 0" class="mt-2">
-            <div class="text-sm font-medium text-amber-200">Errors:</div>
-            <ul class="list-disc list-inside text-sm text-amber-200">
+            <div class="text-sm font-medium text-amber-200/95">Errors:</div>
+            <ul class="list-disc list-inside text-sm text-amber-200/95">
               <li v-for="(e, idx) in lastResult.errors" :key="idx">{{ e }}</li>
             </ul>
           </div>
-          <div v-else class="mt-2 text-sm text-emerald-200">No errors reported.</div>
+          <div v-else class="mt-2 text-sm text-emerald-300/95">No errors reported.</div>
         </div>
       </div>
     </div>
 
-    <div class="mt-6 text-sm text-white/80">
+    <div class="mt-10 border-t border-slate-800 pt-6 text-sm text-slate-400">
       Note: Generation uses admin-defined templates per pool size. Supported pool sizes are 3–6. Ensure templates exist for each size in use.
     </div>
-  </section>
+    </div>
+  </div>
 </template>
 
 <style scoped>

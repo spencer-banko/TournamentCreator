@@ -3,8 +3,12 @@ interface Props {
   title: string;
   subtitle?: string;
   divider?: boolean; // show bottom divider
+  /** Align with Admin Dashboard slate panels (vs default glass-on-black). */
+  variant?: 'default' | 'dashboard';
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  variant: 'default',
+});
 
 // Volar slot typing for named slots
 const slots = defineSlots<{
@@ -16,14 +20,27 @@ const slots = defineSlots<{
 <template>
   <div
     class="w-full"
-    :class="props.divider ? 'pb-3 mb-3 border-b border-white/15' : 'pb-1'"
+    :class="
+      props.divider
+        ? props.variant === 'dashboard'
+          ? 'pb-3 mb-3 border-b border-slate-700/60'
+          : 'pb-3 mb-3 border-b border-white/15'
+        : 'pb-1'
+    "
   >
     <div class="flex items-center justify-between gap-3">
       <div class="min-w-0">
-        <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight truncate">
+        <h2
+          class="text-xl sm:text-2xl font-extrabold tracking-tight truncate"
+          :class="props.variant === 'dashboard' ? 'text-white' : ''"
+        >
           {{ props.title }}
         </h2>
-        <p v-if="props.subtitle" class="mt-0.5 text-sm text-white/80 truncate">
+        <p
+          v-if="props.subtitle"
+          class="mt-0.5 text-sm truncate"
+          :class="props.variant === 'dashboard' ? 'text-slate-400' : 'text-white/80'"
+        >
           {{ props.subtitle }}
         </p>
       </div>

@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
+import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
+import {
+  ChevronDownIcon,
+  ArrowRightStartOnRectangleIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+} from '@heroicons/vue/24/outline';
 import { useSessionStore } from '../stores/session';
 import UiListItem from '@/components/ui/UiListItem.vue';
-import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import AdminTournamentListPanel from '@/components/admin/AdminTournamentListPanel.vue';
 import supabase from '../lib/supabase';
 import { useToast } from 'primevue/usetoast';
@@ -12,10 +18,48 @@ const router = useRouter();
 const session = useSessionStore();
 const toast = useToast();
 
+const copyFeedback = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+const adminEmail = computed(() => {
+  const e = session.adminUser?.email?.trim();
+  return e && e.length > 0 ? e : 'Admin';
+});
+
 async function signOut() {
   await session.signOutAdmin();
   router.replace({ name: 'admin-login' });
 }
+
+function formatEventDateRange(ymd: string | undefined): string {
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return '—';
+  const d = new Date(`${ymd}T12:00:00`);
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+async function copyAccessCode() {
+  const code = session.tournament?.access_code;
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    copyFeedback.value = true;
+    if (copyTimer) clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      copyFeedback.value = false;
+    }, 2000);
+  } catch {
+    toast.add({
+      severity: 'warn',
+      summary: 'Copy failed',
+      detail: 'Your browser blocked clipboard access.',
+      life: 3000,
+    });
+  }
+}
+
+onBeforeUnmount(() => {
+  if (copyTimer) clearTimeout(copyTimer);
+});
 
 const restoringTournament = ref(false);
 
@@ -188,19 +232,18 @@ const navItems = computed<NavItem[]>(() => {
   ];
 });
 
-const leftItems = computed(() => {
-  const all = navItems.value;
-  const mid = Math.ceil(all.length / 2);
-  return all.slice(0, mid);
+const activeTitle = computed(() => {
+  if (restoringTournament.value) return 'Loading…';
+  if (session.tournament) return session.tournament.name;
+  return 'None selected';
 });
 
-const rightItems = computed(() => {
-  const all = navItems.value;
-  const mid = Math.ceil(all.length / 2);
-  return all.slice(mid);
-});
+const activeSubtitle = computed(() =>
+  session.tournament ? '' : 'Choose a tournament below and use View to activate it.'
+);
 
 onMounted(async () => {
+  await session.refreshAdminUser();
   await restoreAdminTournament();
   if (session.tournament) await loadStats();
   else resetStats();
@@ -208,82 +251,208 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto w-full max-w-5xl px-4 py-6">
-    <UiSectionHeading
-      title="Admin Dashboard"
-      subtitle="Tournament setup and day-of operations."
-      :divider="true"
+  <div class="admin-dashboard-shell min-h-dvh flex flex-col bg-[#0b1120] text-slate-100">
+    <!-- Top navigation -->
+    <header
+      class="w-full shrink-0 border-b border-slate-700/60 bg-slate-800/90 shadow-sm shadow-black/20 backdrop-blur-md"
     >
-      <button
-        class="rounded-md border border-white/30 px-3 py-1.5 text-sm hover:bg-white/10"
-        @click="signOut"
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div class="min-w-0">
+          <div class="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
+            GT Beach Volleyball
+            <span
+              class="ml-2 inline-block rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-amber-400/95"
+            >
+              Admin
+            </span>
+          </div>
+        </div>
+
+        <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Menu as="div" class="relative z-50 text-left">
+            <MenuButton
+              type="button"
+              class="inline-flex max-w-[min(100vw-8rem,16rem)] items-center gap-2 rounded-lg border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-left text-sm text-slate-100 shadow-sm transition hover:border-amber-500/35 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50 sm:max-w-xs"
+            >
+              <span class="truncate font-medium">{{ adminEmail }}</span>
+              <ChevronDownIcon class="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            </MenuButton>
+
+            <transition
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="scale-95 opacity-0"
+              enter-to-class="scale-100 opacity-100"
+              leave-active-class="duration-75 ease-in"
+              leave-from-class="scale-100 opacity-100"
+              leave-to-class="scale-95 opacity-0"
+            >
+              <MenuItems
+                class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-700/90 bg-slate-900 py-1 shadow-xl shadow-black/40 ring-1 ring-black/20 focus:outline-none"
+              >
+                <div class="border-b border-slate-800 px-3 py-2">
+                  <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in as</p>
+                  <p class="truncate text-sm text-slate-200">{{ adminEmail }}</p>
+                </div>
+                <MenuItem v-slot="{ active }">
+                  <button
+                    type="button"
+                    class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-slate-200"
+                    :class="active ? 'bg-slate-800 text-white' : ''"
+                    @click="signOut"
+                  >
+                    <ArrowRightStartOnRectangleIcon class="h-5 w-5 text-slate-400" aria-hidden="true" />
+                    <span>Log out</span>
+                  </button>
+                </MenuItem>
+              </MenuItems>
+            </transition>
+          </Menu>
+        </div>
+      </div>
+    </header>
+
+    <div class="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <p class="text-base font-medium text-slate-400 sm:text-lg">Tournament setup and day-of operations</p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">Admin Dashboard</h1>
+
+      <!-- Active tournament hero -->
+      <div
+        class="admin-hero-card relative mt-8 overflow-hidden rounded-2xl border border-slate-600/45 bg-gradient-to-br from-slate-800/90 via-slate-800/75 to-[#1a2740]/95 p-6 shadow-xl shadow-black/30 sm:p-8"
       >
-        Sign Out
-      </button>
-    </UiSectionHeading>
+        <div
+          class="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl"
+          aria-hidden="true"
+        />
+        <div
+          class="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl"
+          aria-hidden="true"
+        />
 
-    <div class="mb-6 rounded-xl border border-white/15 bg-white/5 p-4">
-      <div class="flex flex-col gap-1">
-        <div class="text-sm text-white/80">Active tournament</div>
-        <div class="font-semibold truncate">
-          {{
-            restoringTournament
-              ? 'Loading…'
-              : session.tournament
-                ? session.tournament.name
-                : 'None selected — use View below'
-          }}
+        <div
+          class="inline-flex items-center rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-amber-400/95"
+        >
+          Active Tournament
         </div>
-        <div v-if="session.tournament" class="text-sm text-white/80">
-          Public access code:
-          <span class="font-mono">{{ session.tournament.access_code }}</span>
+
+        <div class="mt-6 space-y-4">
+          <!-- Title row: name + compact access code under name (left); date/teams (right) -->
+          <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
+            <div class="min-w-0 flex-1">
+              <h2
+                class="font-['Plus_Jakarta_Sans',system-ui,sans-serif] text-3xl font-extrabold leading-tight text-white sm:text-4xl lg:text-[2.35rem]"
+              >
+                {{ activeTitle }}
+              </h2>
+
+              <div
+                v-if="session.tournament"
+                class="mt-5 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 px-2.5 py-1.5 sm:gap-x-3"
+              >
+                <div class="flex flex-wrap items-baseline gap-x-1.5 leading-tight">
+                  <span class="text-sm font-medium text-slate-300 sm:text-base">Public access code:</span>
+                  <span class="font-mono text-sm font-bold tracking-wide text-white sm:text-base">
+                    {{ session.tournament.access_code }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-500/45 bg-slate-700/50 px-2.5 py-1.5 text-sm font-medium text-slate-100 transition hover:border-amber-500/35 hover:bg-slate-700/70 hover:text-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
+                  @click="copyAccessCode"
+                >
+                  <CheckIcon v-if="copyFeedback" class="h-4 w-4 text-emerald-400" aria-hidden="true" />
+                  <ClipboardDocumentIcon v-else class="h-4 w-4 text-slate-300" aria-hidden="true" />
+                  <span>{{ copyFeedback ? 'Copied!' : 'Copy code' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-if="session.tournament"
+              class="flex w-full shrink-0 flex-col gap-5 rounded-xl border border-slate-600/40 bg-slate-800/45 px-5 py-4 sm:min-w-[12rem] lg:mt-0 lg:w-auto lg:max-w-[15rem] lg:rounded-none lg:border-0 lg:border-l-2 lg:border-solid lg:border-slate-500/45 lg:bg-transparent lg:px-0 lg:pb-0 lg:pl-8 lg:pt-0"
+            >
+              <div>
+                <div class="text-sm font-semibold uppercase tracking-wide text-slate-300">Date range</div>
+                <div class="mt-1 text-lg font-semibold text-white">
+                  {{ formatEventDateRange(session.tournament.date) }}
+                </div>
+              </div>
+              <div>
+                <div class="text-sm font-semibold uppercase tracking-wide text-slate-300">Teams</div>
+                <div class="mt-1 flex items-baseline gap-2">
+                  <span class="text-2xl font-bold tabular-nums text-white">
+                    {{ stats.loading ? '…' : stats.totalTeams }}
+                  </span>
+                  <span v-if="!stats.loading" class="text-base text-slate-300">registered</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p v-if="activeSubtitle" class="max-w-xl text-sm text-slate-400">
+            {{ activeSubtitle }}
+          </p>
         </div>
       </div>
 
-      <div class="mt-4 border-t border-white/10 pt-4">
-        <div class="mb-2 text-sm font-semibold text-white/90">Your tournaments</div>
-        <AdminTournamentListPanel variant="dashboard" @stats-refresh="onTournamentListStatsRefresh" />
-      </div>
-    </div>
+      <!-- Your tournaments -->
+      <section class="mt-10">
+        <h2 class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Your Tournaments</h2>
+        <p class="mt-2 max-w-3xl text-base leading-relaxed text-slate-400 sm:text-lg">
+          Upcoming events first. Use the actions to work with each tournament.
+        </p>
 
-    <div class="grid grid-cols-1 gap-x-8 lg:grid-cols-2">
-      <div>
-        <div class="rounded-lg border border-white/15 overflow-hidden">
-          <UiListItem
-            v-for="it in leftItems"
+        <div
+          class="admin-tournaments-table-wrap mt-4 overflow-hidden rounded-xl border border-slate-600/45 bg-slate-800/50 p-1 sm:p-2"
+        >
+          <AdminTournamentListPanel variant="dashboard" @stats-refresh="onTournamentListStatsRefresh" />
+        </div>
+      </section>
+
+      <!-- Action grid -->
+      <section class="mt-10">
+        <h2 class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Quick Actions</h2>
+        <p class="mt-2 max-w-3xl text-base leading-relaxed text-slate-400 sm:text-lg">
+          Jump to setup, pools, schedule, and bracket tools.
+        </p>
+
+        <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+          <div
+            v-for="it in navItems"
             :key="it.title"
-            :title="it.title"
-            :description="it.desc"
-            :to="it.to"
-            :icon="it.icon"
-            :disabled="it.disabled"
-            :badge="it.badge"
-            :badgeSeverity="it.badgeSeverity"
-          />
+            class="overflow-hidden rounded-xl border border-slate-600/45 bg-slate-800/50 shadow-lg shadow-black/25 transition hover:border-amber-500/25 hover:shadow-xl hover:shadow-black/35"
+          >
+            <UiListItem
+              cohesive
+              standaloneCard
+              :title="it.title"
+              :description="it.desc"
+              :to="it.to"
+              :icon="it.icon"
+              :disabled="it.disabled"
+              :badge="it.badge"
+              :badgeSeverity="it.badgeSeverity"
+            />
+          </div>
         </div>
-      </div>
-      <div class="mt-6 lg:mt-0">
-        <div class="rounded-lg border border-white/15 overflow-hidden">
-          <UiListItem
-            v-for="it in rightItems"
-            :key="it.title"
-            :title="it.title"
-            :description="it.desc"
-            :to="it.to"
-            :icon="it.icon"
-            :disabled="it.disabled"
-            :badge="it.badge"
-            :badgeSeverity="it.badgeSeverity"
-          />
-        </div>
-      </div>
-    </div>
+      </section>
 
-    <div class="mt-6 text-sm text-white/80">
-      Public site:
-      <router-link class="underline" :to="{ name: 'tournament-public' }">Tournament View</router-link>
+      <div class="mt-10 border-t border-slate-800 pt-6 text-sm text-slate-500">
+        Public site:
+        <router-link
+          class="font-medium text-amber-400/90 underline decoration-amber-500/40 underline-offset-2 hover:text-amber-300"
+          :to="{ name: 'tournament-public' }"
+        >
+          Tournament view
+        </router-link>
+      </div>
     </div>
-  </section>
+  </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.admin-hero-card {
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.06),
+    0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+</style>

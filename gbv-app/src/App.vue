@@ -45,7 +45,7 @@ watchEffect(() => {
     <ConfirmDialog />
 
     <header
-      v-if="!$route.meta.fullScreen"
+      v-if="!$route.meta.fullScreen && !$route.meta.adminDashboardLayout"
       :class="$route.meta.blueLayout ? 'bg-transparent text-white border-b border-white/15' : 'bg-transparent text-white border-b border-white/15'"
     >
       <div class="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
@@ -55,12 +55,18 @@ watchEffect(() => {
       </div>
     </header>
 
-    <main class="flex-1" :class="{ 'mx-auto max-w-6xl w-full px-4 py-6': !$route.meta.fullScreen }">
+    <main
+      class="flex-1"
+      :class="{
+        'mx-auto max-w-6xl w-full px-4 py-6': !$route.meta.fullScreen && !$route.meta.adminDashboardLayout,
+        'w-full min-w-0': $route.meta.adminDashboardLayout,
+      }"
+    >
       <router-view />
     </main>
 
     <footer
-      v-if="!$route.meta.fullScreen"
+      v-if="!$route.meta.fullScreen && !$route.meta.adminDashboardLayout"
       :class="$route.meta.blueLayout ? 'border-t border-white/15 text-sm text-white/80 bg-transparent' : 'border-t border-white/15 text-sm text-white/80 bg-transparent'"
     >
       <div class="mx-auto max-w-6xl px-4 py-4">

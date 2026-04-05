@@ -8,6 +8,12 @@ import Dropdown from 'primevue/dropdown';
 import { useToast } from 'primevue/usetoast';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import UiAccordion from '@/components/ui/UiAccordion.vue';
+import {
+  adminBtnPillPt,
+  adminBtnPillSmPt,
+  adminBtnBluePillClass,
+  adminBtnBluePillSmClass,
+} from '@/lib/adminButtonStyles';
 
 type Matchup = { a: number | null; b: number | null };
 type RoundRow = {
@@ -235,8 +241,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-6">
+  <div class="admin-tool-page -mx-4 min-h-dvh bg-[#0b1120] px-4 py-8 text-slate-100">
+    <div class="mx-auto max-w-6xl">
     <UiSectionHeading
+      variant="dashboard"
       title="Schedule Templates"
       subtitle="Define round-by-round templates per pool size using pickers."
       :divider="true"
@@ -246,20 +254,20 @@ onMounted(async () => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-white/40 !text-white hover:!bg-white/10"
+        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
         @click="router.push({ name: 'admin-dashboard' })"
       />
     </UiSectionHeading>
 
     <!-- Tournament loader -->
-    <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+    <div class="mt-2 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
         <div class="sm:col-span-2">
-          <label class="block text-sm mb-2">Tournament Access Code</label>
+          <label class="mb-2 block text-sm font-medium text-slate-300">Tournament Access Code</label>
           <input
             v-model="accessCode"
             placeholder="e.g. GOJACKETS2025"
-            class="w-full rounded-xl border border-white/30 bg-white px-4 py-3 text-slate-900"
+            class="w-full rounded-xl border border-slate-500/50 bg-white px-4 py-3 text-slate-900"
           />
         </div>
         <div class="flex">
@@ -267,21 +275,22 @@ onMounted(async () => {
             :loading="loading"
             label="Load Tournament"
             icon="pi pi-search"
-            class="!rounded-xl !px-4 !py-3 border-none text-white gbv-grad-blue"
+            :class="adminBtnBluePillClass"
+            :pt="adminBtnPillPt"
             @click="loadTournamentByAccessCode"
           />
         </div>
       </div>
-      <div v-else class="text-sm">
-        Loaded: <span class="font-semibold">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-white/80">({{ session.accessCode }})</span>
+      <div v-else class="text-sm text-slate-300">
+        Loaded: <span class="font-semibold text-white">{{ session.tournament.name }}</span>
+        <span class="ml-2 text-slate-400">({{ session.accessCode }})</span>
       </div>
     </div>
 
     <!-- Pool size & helper note -->
     <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="sm:col-span-1">
-        <label class="block text-sm mb-2">Pool Size</label>
+        <label class="mb-2 block text-sm font-medium text-slate-300">Pool Size</label>
         <Dropdown
           v-model="selectedPoolSize"
           :options="poolSizeOptions"
@@ -291,14 +300,14 @@ onMounted(async () => {
           class="w-full !rounded-xl"
           :pt="{ input: { class: '!py-3 !px-4 !text-base !rounded-xl' } }"
         />
-        <p class="mt-2 text-xs text-white/80">
+        <p class="mt-2 text-xs text-slate-400">
           Supported sizes: 3–6 teams.
         </p>
       </div>
 
       <div class="sm:col-span-2">
-        <div class="rounded-lg border border-white/15 bg-white/5 p-4">
-          <ul class="mt-1 text-sm text-white/90 list-disc list-inside">
+        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+          <ul class="mt-1 list-inside list-disc text-sm text-slate-300">
             <li>Each round can contain multiple matchups.</li>
             <li>Refs and sits are optional lists of seeds.</li>
             <li>Seeds refer to seed_in_pool numbers (1..pool size) from Pools & Seeds.</li>
@@ -323,10 +332,17 @@ onMounted(async () => {
         </div>
 
         <!-- Matchups -->
-        <div class="mt-3 rounded-lg border border-white/15 bg-white/5 p-3">
+        <div class="mt-3 rounded-xl border border-slate-600/40 bg-slate-900/30 p-3">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium">Matchups</div>
-            <Button label="Add Matchup" size="small" icon="pi pi-plus" class="!rounded-xl" @click="addMatchup(r.round)" />
+            <div class="text-sm font-medium text-slate-200">Matchups</div>
+            <Button
+              label="Add Matchup"
+              size="small"
+              icon="pi pi-plus"
+              :class="adminBtnBluePillSmClass"
+              :pt="adminBtnPillSmPt"
+              @click="addMatchup(r.round)"
+            />
           </div>
           <div class="mt-3 grid gap-2">
             <div
@@ -343,7 +359,7 @@ onMounted(async () => {
                 class="!rounded-xl w-36"
                 :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
               />
-              <span class="text-white/80">vs</span>
+              <span class="text-slate-400">vs</span>
               <Dropdown
                 v-model="m.b"
                 :options="seedOptions"
@@ -356,15 +372,22 @@ onMounted(async () => {
               <div class="flex-1"></div>
               <Button icon="pi pi-times" rounded text severity="danger" @click="removeMatchup(r.round, idx)" />
             </div>
-            <div v-if="r.plays.length === 0" class="text-xs text-white/80">No matchups yet.</div>
+            <div v-if="r.plays.length === 0" class="text-xs text-slate-400">No matchups yet.</div>
           </div>
         </div>
 
         <!-- Refs -->
-        <div class="mt-3 rounded-lg border border-white/15 bg-white/5 p-3">
+        <div class="mt-3 rounded-xl border border-slate-600/40 bg-slate-900/30 p-3">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium">Refs (seeds)</div>
-            <Button label="Add Ref" size="small" icon="pi pi-plus" class="!rounded-xl" @click="addRef(r.round)" />
+            <div class="text-sm font-medium text-slate-200">Refs (seeds)</div>
+            <Button
+              label="Add Ref"
+              size="small"
+              icon="pi pi-plus"
+              :class="adminBtnBluePillSmClass"
+              :pt="adminBtnPillSmPt"
+              @click="addRef(r.round)"
+            />
           </div>
           <div class="mt-3 grid gap-2">
             <div
@@ -383,15 +406,22 @@ onMounted(async () => {
               />
               <Button icon="pi pi-times" rounded text severity="danger" @click="removeRef(r.round, idx - 1)" />
             </div>
-            <div v-if="r.refs.length === 0" class="text-xs text-white/80">No refs yet.</div>
+            <div v-if="r.refs.length === 0" class="text-xs text-slate-400">No refs yet.</div>
           </div>
         </div>
 
         <!-- Sits -->
-        <div class="mt-3 rounded-lg border border-white/15 bg-white/5 p-3">
+        <div class="mt-3 rounded-xl border border-slate-600/40 bg-slate-900/30 p-3">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium">Sit (seeds)</div>
-            <Button label="Add Sit" size="small" icon="pi pi-plus" class="!rounded-xl" @click="addSit(r.round)" />
+            <div class="text-sm font-medium text-slate-200">Sit (seeds)</div>
+            <Button
+              label="Add Sit"
+              size="small"
+              icon="pi pi-plus"
+              :class="adminBtnBluePillSmClass"
+              :pt="adminBtnPillSmPt"
+              @click="addSit(r.round)"
+            />
           </div>
           <div class="mt-3 grid gap-2">
             <div
@@ -410,7 +440,7 @@ onMounted(async () => {
               />
               <Button icon="pi pi-times" rounded text severity="danger" @click="removeSit(r.round, idx - 1)" />
             </div>
-            <div v-if="r.sits.length === 0" class="text-xs text-white/80">No sits yet.</div>
+            <div v-if="r.sits.length === 0" class="text-xs text-slate-400">No sits yet.</div>
           </div>
         </div>
       </UiAccordion>
@@ -420,7 +450,8 @@ onMounted(async () => {
         <Button
           label="Add Round"
           icon="pi pi-plus"
-          class="!rounded-xl border-none text-white gbv-grad-blue"
+          :class="adminBtnBluePillClass"
+          :pt="adminBtnPillPt"
           @click="addRound"
         />
         <div class="flex-1"></div>
@@ -429,16 +460,18 @@ onMounted(async () => {
           :loading="saving"
           label="Save Template"
           icon="pi pi-save"
-          class="!rounded-xl border-none text-white gbv-grad-blue"
+          :class="adminBtnBluePillClass"
+          :pt="adminBtnPillPt"
           @click="saveTemplate"
         />
       </div>
     </div>
 
-    <div v-else class="mt-6 rounded-lg border border-dashed border-white/25 p-4 text-sm text-white/80">
+    <div v-else class="mt-6 rounded-xl border border-dashed border-slate-600/50 bg-slate-800/30 p-4 text-sm text-slate-400">
       Select a pool size to begin.
     </div>
-  </section>
+    </div>
+  </div>
 </template>
 
 <style scoped>

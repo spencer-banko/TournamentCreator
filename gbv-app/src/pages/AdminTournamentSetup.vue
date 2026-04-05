@@ -13,6 +13,11 @@ import supabase from '../lib/supabase';
 import { defaultTemplateForPoolSize } from '../lib/defaultTemplates';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import AdminTournamentListPanel from '@/components/admin/AdminTournamentListPanel.vue';
+import {
+  adminBtnPillPt,
+  adminBtnBluePillClass,
+  adminBtnDangerPillClass,
+} from '@/lib/adminButtonStyles';
 import type { Tournament, TournamentStatus, AdvancementRules, GameRules } from '../types/db';
 
 type EditableTournament = {
@@ -418,8 +423,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-6">
+  <div class="admin-tool-page -mx-4 min-h-dvh bg-[#0b1120] px-4 py-8 text-slate-100">
+    <div class="mx-auto max-w-6xl">
     <UiSectionHeading
+      variant="dashboard"
       title="Tournament Setup"
       subtitle="Create and edit tournaments, rules, and status."
       :divider="true"
@@ -429,7 +436,7 @@ onMounted(async () => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-white/40 !text-white hover:!bg-white/10"
+        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
         @click="router.push({ name: 'admin-dashboard' })"
       />
     </UiSectionHeading>
@@ -438,16 +445,12 @@ onMounted(async () => {
       <!-- Left: Tournaments list (wider column for readability) -->
       <div class="sm:col-span-2">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="text-lg font-semibold">Tournaments</h3>
+          <h3 class="text-lg font-semibold text-white">Tournaments</h3>
           <Button
             label="New"
             icon="pi pi-plus"
-            class="!shrink-0 !rounded-full border-none text-white gbv-grad-blue !min-h-[2.75rem] !px-6 !py-2.5 !text-base !gap-2"
-            :pt="{
-              root: { class: 'inline-flex items-center justify-center' },
-              icon: { class: '!text-base' },
-              label: { class: '!text-base !leading-none' },
-            }"
+            :class="adminBtnBluePillClass"
+            :pt="adminBtnPillPt"
             @click="newTournament"
           />
         </div>
@@ -465,22 +468,22 @@ onMounted(async () => {
       <!-- Right: Editor -->
       <div class="sm:col-span-3">
         <!-- Basics -->
-        <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm mb-2">Name</label>
+              <label class="mb-2 block text-sm font-medium text-slate-300">Name</label>
               <InputText v-model="form.name" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="e.g. Fall Classic 2025" />
             </div>
             <div>
-              <label class="block text-sm mb-2">Date (YYYY-MM-DD)</label>
+              <label class="mb-2 block text-sm font-medium text-slate-300">Date (YYYY-MM-DD)</label>
               <InputText v-model="form.date" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="2025-10-12" />
             </div>
             <div>
-              <label class="block text-sm mb-2">Access Code</label>
+              <label class="mb-2 block text-sm font-medium text-slate-300">Access Code</label>
               <InputText v-model="form.access_code" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="GOJACKETS2025" />
             </div>
             <div>
-              <label class="block text-sm mb-2">Status</label>
+              <label class="mb-2 block text-sm font-medium text-slate-300">Status</label>
               <Dropdown
                 v-model="form.status"
                 :options="statusOptions"
@@ -496,15 +499,15 @@ onMounted(async () => {
         <!-- Rules -->
         <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
           <!-- Advancement Rules -->
-          <div class="rounded-lg border border-white/15 bg-white/5 p-4">
-            <div class="text-sm font-semibold">Advancement Rules</div>
+          <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+            <div class="text-sm font-semibold text-white">Advancement Rules</div>
 
             <div class="mt-3 space-y-3">
-              <div class="rounded-lg border border-white/15 bg-white/5 p-3">
-                <div class="text-sm font-medium">Advancers per Pool Size</div>
+              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
+                <div class="text-sm font-medium text-slate-200">Advancers per Pool Size</div>
                 <div class="mt-2 grid grid-cols-1 gap-3">
                   <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-white/80">3 teams</div>
+                    <div class="text-sm text-slate-300">3 teams</div>
                     <Dropdown
                       :options="[0,1,2,3]"
                       :modelValue="getAdvanceCount(3)"
@@ -514,7 +517,7 @@ onMounted(async () => {
                     />
                   </div>
                   <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-white/80">4 teams</div>
+                    <div class="text-sm text-slate-300">4 teams</div>
                     <Dropdown
                       :options="[0,1,2,3,4]"
                       :modelValue="getAdvanceCount(4)"
@@ -524,7 +527,7 @@ onMounted(async () => {
                     />
                   </div>
                   <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-white/80">5 teams</div>
+                    <div class="text-sm text-slate-300">5 teams</div>
                     <Dropdown
                       :options="[0,1,2,3,4,5]"
                       :modelValue="getAdvanceCount(5)"
@@ -534,7 +537,7 @@ onMounted(async () => {
                     />
                   </div>
                   <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-white/80">6 teams</div>
+                    <div class="text-sm text-slate-300">6 teams</div>
                     <Dropdown
                       :options="[0,1,2,3,4,5,6]"
                       :modelValue="getAdvanceCount(6)"
@@ -546,8 +549,8 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <div class="rounded-lg border border-white/15 bg-white/5 p-3">
-                <div class="text-sm font-medium">Bracket Format</div>
+              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
+                <div class="text-sm font-medium text-slate-200">Bracket Format</div>
                 <Dropdown
                   v-model="form.advancement_rules.bracketFormat"
                   :options="[
@@ -561,15 +564,15 @@ onMounted(async () => {
                 />
               </div>
 
-              <div class="rounded-lg border border-white/15 bg-white/5 p-3">
-                <div class="text-sm font-medium">Tiebreakers (reorder with arrows)</div>
+              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
+                <div class="text-sm font-medium text-slate-200">Tiebreakers (reorder with arrows)</div>
                 <ul class="mt-2 space-y-2">
                   <li
                     v-for="(tb, idx) in (form.advancement_rules.tiebreakers || [])"
                     :key="tb"
-                    class="flex items-center justify-between rounded-md border border-white/15 bg-white/5 p-2"
+                    class="flex items-center justify-between rounded-md border border-slate-600/40 bg-slate-900/30 p-2"
                   >
-                    <div class="text-sm capitalize">
+                    <div class="text-sm capitalize text-slate-200">
                       {{ formatTb(tb as any) }}
                     </div>
                     <div class="flex items-center gap-1">
@@ -595,47 +598,47 @@ onMounted(async () => {
           </div>
 
           <!-- Game Rules -->
-          <div class="rounded-lg border border-white/15 bg-white/5 p-4">
-            <div class="text-sm font-semibold">Game Rules</div>
+          <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+            <div class="text-sm font-semibold text-white">Game Rules</div>
 
             <div class="mt-3 grid grid-cols-1 gap-4">
-              <div class="rounded-lg border border-white/15 bg-white/5 p-3">
-                <div class="text-sm font-semibold">Pool Play</div>
+              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
+                <div class="text-sm font-semibold text-white">Pool Play</div>
                 <div class="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs text-white/80 mb-1">Set Target</label>
+                    <label class="block text-xs text-slate-300 mb-1">Set Target</label>
                     <InputNumber v-model="form.game_rules.pool!.setTarget" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                   </div>
                   <div>
-                    <label class="block text-xs text-white/80 mb-1">Cap</label>
+                    <label class="block text-xs text-slate-300 mb-1">Cap</label>
                     <InputNumber v-model="form.game_rules.pool!.cap" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                   </div>
-                  <div class="col-span-2 rounded-lg border border-white/15 bg-white/5 p-3">
-                    <div class="text-xs font-semibold text-white/90">Set Target by Pool Size</div>
+                  <div class="col-span-2 rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
+                    <div class="text-xs font-semibold text-slate-200">Set Target by Pool Size</div>
                     <div class="mt-2 grid grid-cols-2 gap-3">
                       <div>
-                        <label class="block text-xs text-white/80 mb-1">3 teams</label>
+                        <label class="block text-xs text-slate-300 mb-1">3 teams</label>
                         <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['3']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                       </div>
                       <div>
-                        <label class="block text-xs text-white/80 mb-1">4 teams</label>
+                        <label class="block text-xs text-slate-300 mb-1">4 teams</label>
                         <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['4']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                       </div>
                       <div>
-                        <label class="block text-xs text-white/80 mb-1">5 teams</label>
+                        <label class="block text-xs text-slate-300 mb-1">5 teams</label>
                         <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['5']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                       </div>
                       <div>
-                        <label class="block text-xs text-white/80 mb-1">6 teams</label>
+                        <label class="block text-xs text-slate-300 mb-1">6 teams</label>
                         <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['6']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                       </div>
                     </div>
-                    <div class="mt-2 text-xs text-white/70">
+                    <div class="mt-2 text-xs text-slate-400">
                       Overrides the Pool Play Set Target for matches in pools of that size.
                     </div>
                   </div>
                   <div>
-                    <label class="block text-xs text-white/80 mb-1">Best Of</label>
+                    <label class="block text-xs text-slate-300 mb-1">Best Of</label>
                     <Dropdown
                       v-model="form.game_rules.pool!.bestOf"
                       :options="[1,3]"
@@ -645,26 +648,26 @@ onMounted(async () => {
                   </div>
                   <div class="flex items-end">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm">Win by 2</span>
+                      <span class="text-sm text-slate-300">Win by 2</span>
                       <ToggleButton v-model="form.game_rules.pool!.winBy2" onLabel="Yes" offLabel="No" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="rounded-lg border border-white/15 bg-white/5 p-3">
-                <div class="text-sm font-semibold">Bracket</div>
+              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
+                <div class="text-sm font-semibold text-white">Bracket</div>
                 <div class="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs text-white/80 mb-1">Set Target</label>
+                    <label class="block text-xs text-slate-300 mb-1">Set Target</label>
                     <InputNumber v-model="form.game_rules.bracket!.setTarget" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                   </div>
                   <div>
-                    <label class="block text-xs text-white/80 mb-1">Cap</label>
+                    <label class="block text-xs text-slate-300 mb-1">Cap</label>
                     <InputNumber v-model="form.game_rules.bracket!.cap" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                   </div>
                   <div>
-                    <label class="block text-xs text-white/80 mb-1">Best Of</label>
+                    <label class="block text-xs text-slate-300 mb-1">Best Of</label>
                     <Dropdown
                       v-model="form.game_rules.bracket!.bestOf"
                       :options="[1,3]"
@@ -674,12 +677,12 @@ onMounted(async () => {
                   </div>
                   <div class="flex items-end">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm">Win by 2</span>
+                      <span class="text-sm text-slate-300">Win by 2</span>
                       <ToggleButton v-model="form.game_rules.bracket!.winBy2" onLabel="Yes" offLabel="No" />
                     </div>
                   </div>
                   <div v-if="form.game_rules.bracket!.bestOf === 3">
-                    <label class="block text-xs text-white/80 mb-1">Third Set Target</label>
+                    <label class="block text-xs text-slate-300 mb-1">Third Set Target</label>
                     <InputNumber v-model="form.game_rules.bracket!.thirdSetTarget" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
                   </div>
                 </div>
@@ -690,11 +693,11 @@ onMounted(async () => {
 
         <!-- Bracket flags -->
         <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div class="rounded-lg border border-white/15 bg-white/5 p-4">
-            <div class="text-sm">Bracket Started</div>
-            <div class="mt-1 font-semibold">{{ form.bracket_started ? 'Yes' : 'No' }}</div>
-            <div class="mt-2 text-xs text-white/80">Generated at: {{ form.bracket_generated_at || '—' }}</div>
-            <div class="mt-2 text-xs text-white/80">Note: This is managed by the bracket engine.</div>
+          <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+            <div class="text-sm text-slate-200">Bracket Started</div>
+            <div class="mt-1 font-semibold text-white">{{ form.bracket_started ? 'Yes' : 'No' }}</div>
+            <div class="mt-2 text-xs text-slate-300">Generated at: {{ form.bracket_generated_at || '—' }}</div>
+            <div class="mt-2 text-xs text-slate-300">Note: This is managed by the bracket engine.</div>
           </div>
         </div>
 
@@ -704,12 +707,8 @@ onMounted(async () => {
             :loading="saving"
             label="Save"
             icon="pi pi-save"
-            class="!shrink-0 !rounded-full border-none text-white gbv-grad-blue !min-h-[2.75rem] !px-6 !py-2.5 !text-base !gap-2"
-            :pt="{
-              root: { class: 'inline-flex items-center justify-center' },
-              icon: { class: '!text-base' },
-              label: { class: '!text-base !leading-none' },
-            }"
+            :class="adminBtnBluePillClass"
+            :pt="adminBtnPillPt"
             @click="saveTournament"
           />
           <Button
@@ -718,11 +717,13 @@ onMounted(async () => {
             label="Delete"
             icon="pi pi-trash"
             severity="danger"
-            class="!rounded-xl"
+            :class="adminBtnDangerPillClass"
+            :pt="adminBtnPillPt"
             @click="requestDeleteCurrentForm"
           />
         </div>
       </div>
     </div>
-  </section>
+    </div>
+  </div>
 </template>

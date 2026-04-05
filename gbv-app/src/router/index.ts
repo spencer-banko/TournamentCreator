@@ -84,7 +84,7 @@ const routes: RouteRecordRaw[] = [
     path: '/admin',
     name: 'admin-dashboard',
     component: () => import('../pages/AdminDashboard.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
+    meta: { requiresAdmin: true, blueLayout: true, adminDashboardLayout: true },
   },
   {
     path: '/admin/schedule-templates',

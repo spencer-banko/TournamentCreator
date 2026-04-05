@@ -12,6 +12,13 @@ import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
 import { generateBracket, rebuildBracket, checkBracketPrerequisites, type BracketPrereqReport } from '../lib/bracket';
 import { fillRandomPoolScores } from '../lib/testData';
+import {
+  adminBtnPillPt,
+  adminBtnBluePillClass,
+  adminBtnGreenPillClass,
+  adminBtnOrangePillClass,
+} from '@/lib/adminButtonStyles';
+import type { Tournament } from '../types/db';
 
 type UUID = string;
 
@@ -89,6 +96,63 @@ const championName = computed(() => {
   return teamNameById.value[winId] ?? 'TBD';
 });
 
+/** True if any official score, winner, or live score exists on this bracket match. */
+function matchHasLoggedScore(m: Match): boolean {
+  if (m.winner_id) return true;
+  if (m.team1_score != null || m.team2_score != null) return true;
+  if (m.is_live && (m.live_score_team1 != null || m.live_score_team2 != null)) return true;
+  return false;
+}
+
+const hasAnyBracketScoreLogged = computed(() => matches.value.some(matchHasLoggedScore));
+
+const bracketUiStatus = computed((): { label: string; severity: 'success' | 'info' | 'warn' } => {
+  if (matches.value.length === 0) {
+    return { label: 'Not Started', severity: 'info' };
+  }
+  if (championName.value) {
+    return { label: 'Completed', severity: 'success' };
+  }
+  if (hasAnyBracketScoreLogged.value) {
+    return { label: 'In Progress', severity: 'warn' };
+  }
+  return { label: 'Not Started', severity: 'info' };
+});
+
+function teamLabel(teamId: string | null): string {
+  if (!teamId) return 'TBD';
+  return teamNameById.value[teamId] ?? 'TBD';
+}
+
+function scoreForMatchSide(m: Match, side: 1 | 2): string {
+  if (m.is_live) {
+    const v = side === 1 ? m.live_score_team1 : m.live_score_team2;
+    if (v != null) return String(v);
+  }
+  const v = side === 1 ? m.team1_score : m.team2_score;
+  if (v != null) return String(v);
+  return '—';
+}
+
+/** Styling for team name once a winner is known (from DB or derived from scores). */
+function teamResultClass(m: Match, teamId: string | null): string {
+  if (!teamId) return 'text-slate-500';
+  const w = winnerIdFor(m);
+  if (!w) return 'text-white';
+  if (w === teamId) return 'text-emerald-300 font-semibold';
+  const opp = teamId === m.team1_id ? m.team2_id : m.team1_id;
+  if (opp && w === opp) return 'text-slate-500';
+  return 'text-white';
+}
+
+async function refreshTournamentSnapshot() {
+  const id = session.tournament?.id;
+  if (!id) return;
+  const { data, error } = await supabase.from('tournaments').select('*').eq('id', id).single();
+  if (error || !data) return;
+  session.tournament = data as Tournament;
+}
+
 function roundTitle(r: number) {
   const mr = maxRound.value;
   if (mr <= 1) return 'Final';
@@ -136,6 +200,7 @@ async function ensureTournamentByCode() {
     toast.add({ severity: 'success', summary: 'Loaded tournament', detail: t.name, life: 1500 });
     await loadTeams();
     await loadMatches();
+    startBracketPolling();
   } finally {
     loading.value = false;
   }
@@ -174,6 +239,7 @@ async function loadMatches() {
     return;
   }
   matches.value = (data as Match[]) ?? [];
+  await refreshTournamentSnapshot();
 }
 
 async function doGenerate() {
@@ -311,8 +377,26 @@ function back() {
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
+function stopBracketPolling() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function startBracketPolling() {
+  stopBracketPolling();
+  if (!session.tournament) return;
+  refreshTimer = setInterval(() => void loadMatches(), 8_000);
+}
+
+function onWindowFocus() {
+  if (session.tournament) void loadMatches();
+}
+
 onMounted(async () => {
   await session.refreshAdminUser(); // guard handled by router meta
+  window.addEventListener('focus', onWindowFocus);
   if (session.accessCode && !session.tournament) {
     try {
       await session.ensureAnon();
@@ -322,21 +406,20 @@ onMounted(async () => {
   if (session.tournament) {
     await loadTeams();
     await loadMatches();
-    refreshTimer = setInterval(() => void loadMatches(), 15_000);
+    startBracketPolling();
   }
 });
 
 onBeforeUnmount(() => {
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
+  window.removeEventListener('focus', onWindowFocus);
+  stopBracketPolling();
 });
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-6">
+  <div class="admin-bracket-page -mx-4 min-h-dvh bg-[#0b1120] px-4 py-8 text-slate-100">
     <UiSectionHeading
+      variant="dashboard"
       title="Admin Bracket"
       subtitle="Generate, rebuild, and optionally manually adjust bracket matches."
       :divider="true"
@@ -346,16 +429,16 @@ onBeforeUnmount(() => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-white/40 !text-white hover:!bg-white/10"
+        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
         @click="back"
       />
     </UiSectionHeading>
 
     <!-- Tournament loader / context -->
-    <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+    <div class="mt-2 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
         <div class="sm:col-span-2">
-          <label class="block text-sm mb-2">Tournament Access Code</label>
+          <label class="mb-2 block text-sm font-medium text-slate-300">Tournament Access Code</label>
           <InputText
             v-model="accessCode"
             placeholder="e.g. GOJACKETS2025"
@@ -367,74 +450,95 @@ onBeforeUnmount(() => {
             :loading="loading"
             label="Load Tournament"
             icon="pi pi-search"
-            class="!rounded-xl !px-4 !py-3 border-none text-white gbv-grad-blue"
+            :class="adminBtnBluePillClass"
+            :pt="adminBtnPillPt"
             @click="ensureTournamentByCode"
           />
         </div>
       </div>
-      <div v-else class="text-sm">
-        Loaded: <span class="font-semibold">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-white/80">({{ session.accessCode }})</span>
+      <div v-else class="text-sm text-slate-300">
+        Loaded: <span class="font-semibold text-white">{{ session.tournament.name }}</span>
+        <span class="ml-2 text-slate-400">({{ session.accessCode }})</span>
       </div>
     </div>
 
-    <div v-if="session.tournament" class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div v-if="session.tournament" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
       <!-- Actions -->
       <div class="lg:col-span-1">
-        <div class="rounded-lg border border-white/15 bg-white/5 p-4">
+        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium">Bracket Controls</div>
+            <div class="text-sm font-semibold text-slate-200">Bracket Controls</div>
           </div>
           <div class="mt-3 grid gap-3">
             <Button
               :loading="prereqRunning"
               label="Check Bracket Prerequisites"
               icon="pi pi-check-circle"
-              class="!rounded-xl border-none text-white gbv-grad-blue"
+              :class="adminBtnBluePillClass"
+              :pt="adminBtnPillPt"
               @click="doCheckPrereq"
             />
             <Button
               :loading="running"
               label="Generate Bracket"
               icon="pi pi-sitemap"
-              class="!rounded-xl border-none text-white gbv-grad-green"
+              :class="adminBtnGreenPillClass"
+              :pt="adminBtnPillPt"
               @click="doGenerate"
             />
             <Button
               :loading="running"
               label="Fill Pool Scores Randomly"
               icon="pi pi-random"
-              class="!rounded-xl border-none text-white gbv-grad-blue"
+              :class="adminBtnBluePillClass"
+              :pt="adminBtnPillPt"
               @click="doFillPoolScores"
             />
             <Button
               :loading="running"
               label="Rebuild Bracket"
               icon="pi pi-refresh"
-              severity="warn"
-              class="!rounded-xl"
+              :class="adminBtnOrangePillClass"
+              :pt="adminBtnPillPt"
               @click="doRebuild"
             />
-            <div class="mt-2 flex items-center justify-between">
-              <span class="text-sm">Manual Mode</span>
-              <ToggleButton v-model="manualMode" onLabel="On" offLabel="Off" />
+            <div
+              class="mt-2 flex w-full items-center justify-between gap-4 rounded-full border border-slate-600/55 bg-slate-800/65 py-2 pl-5 pr-2 shadow-inner shadow-black/25"
+            >
+              <span class="text-sm font-semibold tracking-wide text-slate-200">Manual Mode</span>
+              <ToggleButton
+                v-model="manualMode"
+                onLabel="On"
+                offLabel="Off"
+                onIcon="pi pi-pencil"
+                offIcon="pi pi-lock"
+                aria-label="Toggle manual bracket editing"
+                class="manual-mode-toggle"
+                :pt="{
+                  root: {
+                    class:
+                      '!min-h-[2.75rem] !min-w-[6.5rem] !rounded-full !border-2 !font-semibold !text-sm !transition-all !duration-200 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-amber-400/55 focus-visible:!ring-offset-2 focus-visible:!ring-offset-[#0b1120]',
+                  },
+                  label: { class: '!px-1' },
+                  icon: { class: '!text-base' },
+                }"
+              />
             </div>
           </div>
-          <div class="mt-4 text-xs text-white/80">
+          <div class="mt-4 text-xs text-slate-400">
             Status:
-            <Tag
-              :value="session.tournament.bracket_started ? 'Started' : 'Not Started'"
-              :severity="session.tournament.bracket_started ? 'warn' : 'info'"
-            />
-            <div class="mt-1">
+            <Tag :value="bracketUiStatus.label" :severity="bracketUiStatus.severity" />
+            <div class="mt-1 text-slate-500">
               Generated at: {{ session.tournament.bracket_generated_at || '—' }}
             </div>
           </div>
 
           <!-- Diagnostics Panel -->
-          <div class="mt-4 text-xs text-white/80 rounded-lg border border-white/15 bg-white/5 p-3">
+          <div
+            class="mt-4 rounded-xl border border-slate-600/40 bg-slate-900/50 p-3 text-xs text-slate-400 shadow-inner shadow-black/20"
+          >
             <div class="flex items-center justify-between">
-              <div class="text-sm font-medium">Diagnostics</div>
+              <div class="text-sm font-semibold text-slate-200">Diagnostics</div>
               <Tag
                 v-if="prereqReport"
                 :value="prereqReport.ok ? 'Ready' : 'Blocked'"
@@ -443,7 +547,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-if="prereqReport" class="mt-2 space-y-2">
-              <div>
+              <div class="text-slate-300">
                 Pools: {{ prereqReport.stats.poolCount }},
                 Teams: {{ prereqReport.stats.teamCount }}
                 • Expected advancers: {{ prereqReport.stats.expectedAdvancers }},
@@ -455,14 +559,14 @@ onBeforeUnmount(() => {
 
               <div v-if="prereqReport.errors.length">
                 <div class="mb-1 font-medium text-white">Errors</div>
-                <ul class="list-disc list-inside">
+                <ul class="list-disc list-inside text-slate-300">
                   <li v-for="(e, i) in prereqReport.errors" :key="'pe'+i">{{ e }}</li>
                 </ul>
               </div>
 
               <div v-if="prereqReport.unscored.length">
                 <div class="mb-1 font-medium text-white">Unscored pool matches</div>
-                <ul class="list-disc list-inside max-h-40 overflow-auto pr-2">
+                <ul class="list-disc list-inside max-h-40 overflow-auto pr-2 text-slate-300">
                   <li v-for="u in prereqReport.unscored" :key="'u'+u.matchId">
                     {{ (u.poolName || 'Unknown Pool') }} • {{ u.matchId.slice(0, 8) }}
                   </li>
@@ -471,19 +575,19 @@ onBeforeUnmount(() => {
 
               <div v-if="prereqReport.infos.length">
                 <div class="mb-1 font-medium text-white">Info</div>
-                <ul class="list-disc list-inside">
+                <ul class="list-disc list-inside text-slate-300">
                   <li v-for="(e, i) in prereqReport.infos" :key="'pi'+i">{{ e }}</li>
                 </ul>
               </div>
             </div>
 
-            <div v-else class="mt-2 text-white/70">
+            <div v-else class="mt-2 text-slate-500">
               Run "Check Bracket Prerequisites" to analyze readiness.
             </div>
 
             <div v-if="lastErrors.length && (lastOp === 'generate' || lastOp === 'rebuild')" class="mt-3">
               <div class="mb-1 font-medium text-white">Last {{ lastOp }} errors</div>
-              <ul class="list-disc list-inside">
+              <ul class="list-disc list-inside text-slate-300">
                 <li v-for="(e, i) in lastErrors" :key="'le'+i">{{ e }}</li>
               </ul>
             </div>
@@ -493,42 +597,54 @@ onBeforeUnmount(() => {
 
       <!-- Bracket Matches -->
       <div class="lg:col-span-2">
-        <div v-if="matches.length === 0" class="rounded-lg border border-white/15 bg-white/5 p-6 text-sm">
+        <div
+          v-if="matches.length === 0"
+          class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-6 text-sm text-slate-400 shadow-lg shadow-black/20"
+        >
           No bracket matches yet.
         </div>
 
         <div v-else class="grid gap-6">
           <div
             v-if="championName"
-            class="rounded-2xl bg-white/10 ring-2 ring-amber-300/60 p-5 text-center text-white"
+            class="admin-bracket-champion relative overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-br from-slate-800/95 via-slate-800/80 to-[#1a2740]/95 p-5 text-center text-white shadow-xl shadow-black/30"
           >
-            <div class="text-2xl font-extrabold leading-tight">
+            <div
+              class="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl"
+              aria-hidden="true"
+            />
+            <div class="relative text-2xl font-extrabold leading-tight text-white">
               {{ championName }} WON!! 🎉🎉
             </div>
-            <div class="mt-1 text-white/80 font-medium">
+            <div class="relative mt-1 font-medium text-slate-300">
               Thank you for playing!
             </div>
           </div>
-          <div v-for="[r, arr] in groupedByRound()" :key="r" class="rounded-lg border border-white/15 bg-white/5 overflow-hidden">
-            <div class="border-b border-white/15 px-4 py-3">
-              <div class="text-sm font-semibold">{{ roundTitle(r) }}</div>
+          <div
+            v-for="[r, arr] in groupedByRound()"
+            :key="r"
+            class="overflow-hidden rounded-xl border border-slate-600/45 bg-slate-800/50 shadow-lg shadow-black/20"
+          >
+            <div class="border-b border-slate-600/45 bg-slate-800/60 px-4 py-3">
+              <div class="text-sm font-semibold text-white">{{ roundTitle(r) }}</div>
             </div>
-            <div class="p-4 grid gap-3">
+            <div class="grid gap-3 p-4">
               <div
                 v-for="m in arr"
                 :key="m.id"
-                class="rounded-xl border border-white/15 bg-white/10 p-4"
+                class="rounded-xl border border-slate-600/40 bg-slate-800/40 p-4"
               >
                 <div class="flex items-center justify-between">
-                  <div class="text-xs text-white/80">
-                    Match {{ m.id.slice(0, 8) }} • {{ m.match_type === 'bracket' ? 'Bracket' : 'Pool' }}{{ m.round_number ? ` R${m.round_number}` : '' }}
+                  <div class="text-xs text-slate-400">
+                    Match {{ m.id.slice(0, 8) }} • {{ m.match_type === 'bracket' ? 'Bracket' : 'Pool'
+                    }}{{ m.round_number != null ? ' R' + m.round_number : '' }}
                   </div>
                   <Tag v-if="m.is_live" value="LIVE" severity="danger" />
                 </div>
 
-                <div v-if="manualMode" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div v-if="manualMode" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div>
-                    <label class="block text-xs mb-1">Team 1</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-400">Team 1</label>
                     <Dropdown
                       :modelValue="m.team1_id"
                       :options="teamOptions"
@@ -540,7 +656,7 @@ onBeforeUnmount(() => {
                     />
                   </div>
                   <div>
-                    <label class="block text-xs mb-1">Team 2</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-400">Team 2</label>
                     <Dropdown
                       :modelValue="m.team2_id"
                       :options="teamOptions"
@@ -553,11 +669,45 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
 
-                <div v-else class="mt-3 text-sm">
-                  <div class="font-semibold">
-                    {{ (teams.find(t => t.id === m.team1_id)?.full_team_name) || 'TBD' }}
-                    <span class="text-white/70"> vs </span>
-                    {{ (teams.find(t => t.id === m.team2_id)?.full_team_name) || 'TBD' }}
+                <div
+                  class="mt-3 rounded-lg border border-slate-600/35 bg-slate-900/30 px-3 py-2.5"
+                  :class="m.is_live ? 'ring-1 ring-red-500/25' : ''"
+                >
+                  <div v-if="m.is_live" class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-red-300/90">
+                    Live scores (updates on refresh)
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-1 items-center gap-2">
+                      <span :class="['min-w-0 truncate text-sm', teamResultClass(m, m.team1_id)]">
+                        {{ teamLabel(m.team1_id) }}
+                      </span>
+                      <span
+                        v-if="winnerIdFor(m) && winnerIdFor(m) === m.team1_id"
+                        class="shrink-0 rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300"
+                      >
+                        Won
+                      </span>
+                    </div>
+                    <span class="shrink-0 tabular-nums text-lg font-bold text-slate-100">{{
+                      scoreForMatchSide(m, 1)
+                    }}</span>
+                  </div>
+                  <div class="my-2 border-t border-slate-600/35" />
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-1 items-center gap-2">
+                      <span :class="['min-w-0 truncate text-sm', teamResultClass(m, m.team2_id)]">
+                        {{ teamLabel(m.team2_id) }}
+                      </span>
+                      <span
+                        v-if="winnerIdFor(m) && winnerIdFor(m) === m.team2_id"
+                        class="shrink-0 rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300"
+                      >
+                        Won
+                      </span>
+                    </div>
+                    <span class="shrink-0 tabular-nums text-lg font-bold text-slate-100">{{
+                      scoreForMatchSide(m, 2)
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -570,7 +720,7 @@ onBeforeUnmount(() => {
                 size="small"
                 severity="secondary"
                 outlined
-                class="!rounded-xl"
+                class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80"
                 @click="loadMatches"
               />
             </div>
@@ -579,12 +729,45 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="mt-6 text-sm text-white/80">
+    <div class="mt-10 border-t border-slate-800 pt-6 text-sm text-slate-500">
       Notes:
-      <ul class="list-disc list-inside">
+      <ul class="mt-2 list-disc list-inside text-slate-400">
         <li>Policy A: Top 2 advance per pool; bracket size up to 8 with byes to top seeds.</li>
         <li>Rebuild is blocked once the bracket has started (any bracket match goes live or is scored).</li>
       </ul>
     </div>
-  </section>
+  </div>
 </template>
+
+<style scoped>
+.admin-bracket-champion {
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.08),
+    0 20px 40px -12px rgba(0, 0, 0, 0.45);
+}
+
+/* Manual mode toggle: obvious off (muted) vs on (amber pill), same family as Generate/Rebuild CTAs */
+.admin-bracket-page :deep(.manual-mode-toggle.p-togglebutton:not(.p-togglebutton-checked)) {
+  background: rgb(30 41 59 / 0.95) !important;
+  border-color: rgb(100 116 139 / 0.7) !important;
+  color: rgb(226 232 240) !important;
+}
+
+.admin-bracket-page :deep(.manual-mode-toggle.p-togglebutton.p-togglebutton-checked) {
+  background: linear-gradient(135deg, #f5931a 0%, #faa237 100%) !important;
+  border-color: rgb(251 191 36 / 0.55) !important;
+  color: white !important;
+  box-shadow:
+    0 0 0 3px rgba(251, 191, 36, 0.22),
+    0 8px 20px -8px rgba(0, 0, 0, 0.45);
+}
+
+.admin-bracket-page :deep(.manual-mode-toggle.p-togglebutton:not(.p-togglebutton-checked):hover:not(:disabled)) {
+  border-color: rgb(148 163 184 / 0.85) !important;
+  background: rgb(51 65 85 / 0.85) !important;
+}
+
+.admin-bracket-page :deep(.manual-mode-toggle.p-togglebutton.p-togglebutton-checked:hover:not(:disabled)) {
+  filter: brightness(1.06);
+}
+</style>
