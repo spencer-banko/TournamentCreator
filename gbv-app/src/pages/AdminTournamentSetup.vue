@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
+import { useSessionStore } from '../stores/session';
 import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
 import InputNumber from 'primevue/inputnumber';
 import ToggleButton from 'primevue/togglebutton';
 import supabase from '../lib/supabase';
 import { defaultTemplateForPoolSize } from '../lib/defaultTemplates';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
+import AdminTournamentListPanel from '@/components/admin/AdminTournamentListPanel.vue';
 import type { Tournament, TournamentStatus, AdvancementRules, GameRules } from '../types/db';
 
 type EditableTournament = {
@@ -27,12 +28,14 @@ type EditableTournament = {
 };
 
 const router = useRouter();
+const route = useRoute();
 const toast = useToast();
+const confirm = useConfirm();
+const session = useSessionStore();
 
-const loading = ref(false);
 const saving = ref(false);
-const tournaments = ref<Tournament[]>([]);
 const selectedId = ref<string | null>(null);
+const tournamentListRef = ref<InstanceType<typeof AdminTournamentListPanel> | null>(null);
 
 const statusOptions: { label: string; value: TournamentStatus }[] = [
   { label: 'Draft', value: 'draft' },
@@ -150,24 +153,6 @@ function normalizeGameRules(r: GameRules | null | undefined): GameRules {
   };
 }
 
-async function loadTournaments() {
-  loading.value = true;
-  try {
-    const { data, error } = await supabase
-      .from('tournaments')
-      .select('*')
-      .order('date', { ascending: false });
-    if (error) {
-      toast.add({ severity: 'error', summary: 'Load failed', detail: error.message, life: 3000 });
-      tournaments.value = [];
-      return;
-    }
-    tournaments.value = (data || []) as Tournament[];
-  } finally {
-    loading.value = false;
-  }
-}
-
 function newTournament() {
   selectedId.value = null;
   toForm(null);
@@ -176,6 +161,22 @@ function newTournament() {
 function selectTournament(t: Tournament) {
   selectedId.value = t.id;
   toForm(t);
+}
+
+function requestDeleteCurrentForm() {
+  if (!form.value.id) return;
+  const name =
+    tournamentListRef.value?.getTournaments().find((x: Tournament) => x.id === form.value.id)?.name ??
+    form.value.name;
+  confirm.require({
+    message: `Delete "${name}"? This cannot be undone.`,
+    header: 'Delete tournament',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: () => {
+      void executeDeleteTournament(form.value.id!);
+    },
+  });
 }
 
 // Helpers — Advancement UI
@@ -312,6 +313,28 @@ async function saveTournament() {
       if (error) throw error;
       toast.add({ severity: 'success', summary: 'Tournament updated', life: 1500 });
     } else {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (authErr || !user) {
+        toast.add({
+          severity: 'error',
+          summary: 'Not signed in',
+          detail: 'Sign in again to create a tournament.',
+          life: 4000,
+        });
+        return;
+      }
+      if (user.is_anonymous) {
+        toast.add({
+          severity: 'error',
+          summary: 'Email sign-in required',
+          detail: 'Guest mode cannot create tournaments. Use Admin Login with your email and password.',
+          life: 5000,
+        });
+        return;
+      }
+      await session.refreshAdminUser();
+      // Let DB trigger tournaments_set_created_by set created_from JWT (avoids RLS/client uid mismatch).
       const { data, error } = await supabase.from('tournaments').insert(payload).select('*').single();
       if (error) throw error;
       toast.add({ severity: 'success', summary: 'Tournament created', life: 1500 });
@@ -343,10 +366,10 @@ async function saveTournament() {
         }
       }
     }
-    await loadTournaments();
-    // Re-select to reflect persisted state
+    await tournamentListRef.value?.loadTournaments();
+    const list = tournamentListRef.value?.getTournaments() ?? [];
     if (selectedId.value) {
-      const t = tournaments.value.find((x) => x.id === selectedId.value) || null;
+      const t = list.find((x: Tournament) => x.id === selectedId.value) || null;
       toForm(t);
     }
   } catch (err: any) {
@@ -359,17 +382,20 @@ async function saveTournament() {
   }
 }
 
-async function deleteTournament() {
-  if (!form.value.id) return;
-  const ok = confirm('Delete this tournament? This cannot be undone.');
-  if (!ok) return;
+async function executeDeleteTournament(id: string) {
   saving.value = true;
   try {
-    const { error } = await supabase.from('tournaments').delete().eq('id', form.value.id);
+    const { error } = await supabase.from('tournaments').delete().eq('id', id);
     if (error) throw error;
     toast.add({ severity: 'success', summary: 'Tournament deleted', life: 1500 });
-    await loadTournaments();
-    newTournament();
+    if (session.getAdminActiveTournamentId() === id) {
+      session.clearAdminActiveTournament({ clearPublicAccessCode: true });
+    }
+    if (selectedId.value === id) {
+      selectedId.value = null;
+      toForm(null);
+    }
+    await tournamentListRef.value?.loadTournaments();
   } catch (err: any) {
     toast.add({ severity: 'error', summary: 'Delete failed', detail: err?.message ?? 'Unknown error', life: 3500 });
   } finally {
@@ -377,8 +403,17 @@ async function deleteTournament() {
   }
 }
 
+function onTournamentListReady() {
+  const editId = typeof route.query.edit === 'string' ? route.query.edit : '';
+  if (!editId) return;
+  const list = tournamentListRef.value?.getTournaments() ?? [];
+  const t = list.find((x: Tournament) => x.id === editId);
+  if (t) selectTournament(t);
+  router.replace({ path: route.path, query: {} });
+}
+
 onMounted(async () => {
-  await loadTournaments();
+  await session.refreshAdminUser();
 });
 </script>
 
@@ -399,49 +434,36 @@ onMounted(async () => {
       />
     </UiSectionHeading>
 
-    <div class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-3">
-      <!-- Left: Tournaments list -->
-      <div class="sm:col-span-1">
-        <div class="flex items-center justify-between">
+    <div class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-5">
+      <!-- Left: Tournaments list (wider column for readability) -->
+      <div class="sm:col-span-2">
+        <div class="flex items-center justify-between gap-3">
           <h3 class="text-lg font-semibold">Tournaments</h3>
           <Button
             label="New"
             icon="pi pi-plus"
-            class="!rounded-xl border-none text-white gbv-grad-blue"
+            class="!shrink-0 !rounded-full border-none text-white gbv-grad-blue !min-h-[2.75rem] !px-6 !py-2.5 !text-base !gap-2"
+            :pt="{
+              root: { class: 'inline-flex items-center justify-center' },
+              icon: { class: '!text-base' },
+              label: { class: '!text-base !leading-none' },
+            }"
             @click="newTournament"
           />
         </div>
 
         <div class="mt-3">
-          <DataTable
-            :value="tournaments"
-            size="small"
-            class="rounded-xl overflow-hidden"
-            :loading="loading"
-            tableClass="!text-sm"
-            :pt="{
-              table: { class: 'bg-transparent' },
-              thead: { class: 'bg-white/10 text-white' },
-              tbody: { class: 'text-white/90' }
-            }"
-          >
-            <Column field="name" header="Name" headerClass="!bg-white/10 !text-white">
-              <template #body="{ data }">
-                <div class="font-medium">{{ data.name }}</div>
-                <div class="text-xs text-white/80">{{ data.date }} • {{ data.status }}</div>
-              </template>
-            </Column>
-            <Column header="" style="width: 5rem" headerClass="!bg-white/10 !text-white">
-              <template #body="{ data }">
-                <Button label="Edit" size="small" text class="!text-white" @click="selectTournament(data)" />
-              </template>
-            </Column>
-          </DataTable>
+          <AdminTournamentListPanel
+            ref="tournamentListRef"
+            variant="setup"
+            @edit="selectTournament"
+            @ready="onTournamentListReady"
+          />
         </div>
       </div>
 
       <!-- Right: Editor -->
-      <div class="sm:col-span-2">
+      <div class="sm:col-span-3">
         <!-- Basics -->
         <div class="rounded-lg border border-white/15 bg-white/5 p-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -682,7 +704,12 @@ onMounted(async () => {
             :loading="saving"
             label="Save"
             icon="pi pi-save"
-            class="!rounded-xl border-none text-white gbv-grad-blue"
+            class="!shrink-0 !rounded-full border-none text-white gbv-grad-blue !min-h-[2.75rem] !px-6 !py-2.5 !text-base !gap-2"
+            :pt="{
+              root: { class: 'inline-flex items-center justify-center' },
+              icon: { class: '!text-base' },
+              label: { class: '!text-base !leading-none' },
+            }"
             @click="saveTournament"
           />
           <Button
@@ -692,7 +719,7 @@ onMounted(async () => {
             icon="pi pi-trash"
             severity="danger"
             class="!rounded-xl"
-            @click="deleteTournament"
+            @click="requestDeleteCurrentForm"
           />
         </div>
       </div>

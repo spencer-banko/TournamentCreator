@@ -12,6 +12,7 @@ type SessionState = {
 };
 
 const ACCESS_CODE_KEY = 'gbv.access_code';
+const ADMIN_ACTIVE_TOURNAMENT_ID_KEY = 'gbv.admin_active_tournament_id';
 
 export const useSessionStore = defineStore('session', {
   state: (): SessionState => ({
@@ -53,6 +54,45 @@ export const useSessionStore = defineStore('session', {
       }
     },
 
+    getAdminActiveTournamentId(): string | null {
+      if (typeof localStorage === 'undefined') return null;
+      return localStorage.getItem(ADMIN_ACTIVE_TOURNAMENT_ID_KEY);
+    },
+
+    /** Persist which tournament the admin is working on (dashboard + tools). */
+    setAdminActiveTournamentId(id: string | null) {
+      try {
+        if (id) localStorage.setItem(ADMIN_ACTIVE_TOURNAMENT_ID_KEY, id);
+        else localStorage.removeItem(ADMIN_ACTIVE_TOURNAMENT_ID_KEY);
+      } catch {
+        // ignore
+      }
+    },
+
+    /** Set active admin tournament context (RLS: must be owned by current admin). */
+    setAdminActiveTournament(t: Tournament) {
+      this.tournament = t;
+      this.setAdminActiveTournamentId(t.id);
+      this.setAccessCode(t.access_code);
+    },
+
+    /**
+     * Clear admin working tournament. Optionally clear stored public access code
+     * (e.g. after deleting that tournament so fans are not sent to a removed event).
+     */
+    clearAdminActiveTournament(opts?: { clearPublicAccessCode?: boolean }) {
+      this.tournament = null;
+      this.setAdminActiveTournamentId(null);
+      if (opts?.clearPublicAccessCode) {
+        this.accessCode = null;
+        try {
+          localStorage.removeItem(ACCESS_CODE_KEY);
+        } catch {
+          // ignore
+        }
+      }
+    },
+
     async ensureAnon() {
       const { default: supabase } = await import('../lib/supabase');
       const { data: sess } = await supabase.auth.getSession();
@@ -84,6 +124,20 @@ export const useSessionStore = defineStore('session', {
       return this.tournament;
     },
 
+    /** Load a tournament by id as the logged-in admin (email user). */
+    async loadAdminTournamentById(id: string) {
+      const { default: supabase } = await import('../lib/supabase');
+      const { data, error } = await supabase.from('tournaments').select('*').eq('id', id).single();
+      if (error || !data) {
+        this.tournament = null;
+        this.setAdminActiveTournamentId(null);
+        return null;
+      }
+      const t = data as Tournament;
+      this.setAdminActiveTournament(t);
+      return t;
+    },
+
     async listTournamentsByDate(date: string): Promise<TournamentSummary[]> {
       const { default: supabase } = await import('../lib/supabase');
       const { data, error } = await supabase
@@ -105,6 +159,8 @@ export const useSessionStore = defineStore('session', {
 
     async signInAdminWithEmail(email: string, password: string) {
       const { default: supabase } = await import('../lib/supabase');
+      // Clear any anonymous session so the JWT is definitely the email user (RLS insert requires non-anonymous).
+      await supabase.auth.signOut();
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       this.adminUser = data.user;
@@ -115,6 +171,7 @@ export const useSessionStore = defineStore('session', {
       const { default: supabase } = await import('../lib/supabase');
       await supabase.auth.signOut();
       this.adminUser = null;
+      this.clearAdminActiveTournament();
     },
   },
 });

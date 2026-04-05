@@ -42,34 +42,70 @@ body {
   background-image: linear-gradient(135deg, #1b6a08 0%, #29820c 100%);
 }
 
-/* Custom PrimeVue Toast Styles */
+/* PrimeVue Toast — dark surfaces + light text (readable on black app shell; fixes error white-on-white) */
 .p-toast {
-  min-width: 350px; /* Larger width */
+  min-width: 350px;
 }
 
 .p-toast .p-toast-message {
-  background: white !important; /* Solid white for entire message */
-  padding: 1.5rem; /* Larger padding */
-  font-size: 1.1rem; /* Larger text */
-  border: 1px solid #e5e7eb !important; /* Subtle border for entire toast */
-  border-radius: 0.5rem !important; /* Rounded corners */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; /* Shadow for visibility */
+  padding: 1.25rem 1.5rem !important;
+  font-size: 1.05rem !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 4px 10px -4px rgba(0, 0, 0, 0.35) !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  color: #f8fafc !important;
 }
 
-.p-toast .p-toast-message .p-toast-message-content {
-  background: transparent !important; /* Ensure inner is transparent to inherit outer white */
+.p-toast .p-toast-message-content {
+  background: transparent !important;
 }
 
-.p-toast .p-toast-message .p-toast-message-content .p-toast-summary {
-  font-weight: bold;
-  font-size: 1.2rem;
+.p-toast .p-toast-summary {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #f8fafc !important;
 }
 
-.p-toast .p-toast-message .p-toast-message-content .p-toast-detail {
-  margin-top: 0.5rem;
+.p-toast .p-toast-detail {
+  margin-top: 0.4rem;
+  color: rgba(248, 250, 252, 0.92) !important;
 }
 
-/* Icons and close button use default colors */
+.p-toast .p-toast-message-icon,
+.p-toast .p-toast-close-button {
+  color: #f8fafc !important;
+}
+
+.p-toast .p-toast-close-icon {
+  color: inherit !important;
+}
+
+.p-toast .p-toast-message-info {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%) !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
+}
+
+.p-toast .p-toast-message-success {
+  background: linear-gradient(135deg, #14532d 0%, #15803d 100%) !important;
+  border-color: rgba(74, 222, 128, 0.4) !important;
+}
+
+.p-toast .p-toast-message-warn {
+  background: linear-gradient(135deg, #78350f 0%, #b45309 100%) !important;
+  border-color: rgba(251, 191, 36, 0.45) !important;
+}
+
+.p-toast .p-toast-message-error {
+  background: linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%) !important;
+  border-color: rgba(248, 113, 113, 0.5) !important;
+}
+
+.p-toast .p-toast-message-secondary,
+.p-toast .p-toast-message-contrast {
+  background: rgba(15, 23, 42, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
 
 .gbv-grad-blue {
   background-color: #2d51a6;
@@ -145,4 +181,20 @@ body {
   background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 37%, #e5e7eb 63%);
   background-size: 400% 100%;
   animation: gbv-shimmer 1.4s ease infinite;
+}
+
+/* Confirm dialog on dark admin shell */
+.p-confirmdialog .p-dialog {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+.p-confirmdialog .p-dialog-header,
+.p-confirmdialog .p-dialog-content {
+  background: transparent !important;
+  color: inherit !important;
+}
+.p-confirmdialog .p-dialog-footer {
+  background: transparent !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }

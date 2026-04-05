@@ -4,6 +4,7 @@ import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
 import 'primeicons/primeicons.css';
 import ToastService from 'primevue/toastservice';
+import ConfirmationService from 'primevue/confirmationservice';
 import router from './router';
 import './style.css';
 import './styles/bracket-theme.css';
@@ -14,6 +15,7 @@ const app = createApp(App);
 app.use(createPinia());
 app.use(router);
 app.use(ToastService);
+app.use(ConfirmationService);
 app.use(PrimeVue, {
   ripple: true,
   theme: {

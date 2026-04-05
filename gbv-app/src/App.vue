@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Toast from 'primevue/toast';
+import ConfirmDialog from 'primevue/confirmdialog';
 import { watchEffect } from 'vue';
 
 watchEffect(() => {
@@ -41,6 +42,7 @@ watchEffect(() => {
 <template>
   <div class="min-h-full min-h-dvh flex flex-col bg-black text-white">
     <Toast />
+    <ConfirmDialog />
 
     <header
       v-if="!$route.meta.fullScreen"

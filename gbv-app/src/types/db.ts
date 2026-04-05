@@ -58,6 +58,8 @@ export interface Tournament {
   bracket_started: boolean; // schema default false
   bracket_generated_at: string | null; // timestamptz
   created_at: string; // timestamptz
+  /** Supabase Auth user id of the admin who created the row (RLS ownership). */
+  created_by: UUID | null;
 }
 
 /**

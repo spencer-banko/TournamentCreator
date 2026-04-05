@@ -15,10 +15,14 @@ create table if not exists public.tournaments (
   status text not null default 'draft' check (status in ('draft','setup','pool_play','bracket','completed')),
   bracket_started boolean not null default false,
   bracket_generated_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users (id) on delete set null
 );
 
+alter table public.tournaments add column if not exists created_by uuid references auth.users (id) on delete set null;
+
 create index if not exists idx_tournaments_date on public.tournaments(date);
+create index if not exists idx_tournaments_created_by on public.tournaments (created_by);
 
 -- =========================
 -- pools
@@ -163,9 +167,8 @@ alter table public.matches enable row level security;
 alter table public.schedule_templates enable row level security;
 
 -- Idempotent policy creation pattern: DROP IF EXISTS, then CREATE
--- PUBLIC read access (explicit TO public) — replace TO public with TO authenticated if you want only logged-in users
+-- Tournaments: no blanket TO public SELECT (would bypass owner checks). Anon + authenticated rules below.
 drop policy if exists "tournaments_read_all" on public.tournaments;
-create policy "tournaments_read_all" on public.tournaments for select to public using (true);
 
 drop policy if exists "pools_read_all" on public.pools;
 create policy "pools_read_all" on public.pools for select to public using (true);
@@ -191,60 +194,216 @@ create policy "matches_write_public" on public.matches for insert to public with
 create policy "matches_update_public" on public.matches for update to public using (true) with check (true);
 -- Allow delete on matches for authenticated (admin) users
 drop policy if exists "matches_delete_authenticated" on public.matches;
-create policy "matches_delete_authenticated" on public.matches for delete to authenticated using (true);
+create policy "matches_delete_authenticated" on public.matches for delete to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = matches.tournament_id and t.created_by = auth.uid()
+  )
+);
 
--- Admin write access (authenticated) — split FOR ALL into explicit policies (do NOT use FOR ALL)
--- tournaments
+-- Tournament ownership: anonymous JWT (public site) vs email admin (created_by = auth.uid())
+drop policy if exists "tournaments_select_anon" on public.tournaments;
+create policy "tournaments_select_anon" on public.tournaments for select to anon using (true);
+
 drop policy if exists "tournaments_select_authenticated" on public.tournaments;
-create policy "tournaments_select_authenticated" on public.tournaments for select to authenticated using (true);
+create policy "tournaments_select_authenticated" on public.tournaments for select to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or created_by = auth.uid()
+);
 
 drop policy if exists "tournaments_insert_authenticated" on public.tournaments;
-create policy "tournaments_insert_authenticated" on public.tournaments for insert to authenticated with check (true);
+create policy "tournaments_insert_authenticated" on public.tournaments for insert to authenticated with check (
+  auth.uid() is not null
+  and (auth.jwt() ->> 'is_anonymous') is distinct from 'true'
+  and (created_by is null or created_by = auth.uid())
+);
 
 drop policy if exists "tournaments_update_authenticated" on public.tournaments;
-create policy "tournaments_update_authenticated" on public.tournaments for update to authenticated using (true) with check (true);
+create policy "tournaments_update_authenticated" on public.tournaments for update to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') is distinct from 'true'
+  and created_by = auth.uid()
+) with check (
+  (auth.jwt() ->> 'is_anonymous') is distinct from 'true'
+  and created_by = auth.uid()
+);
 
 drop policy if exists "tournaments_delete_authenticated" on public.tournaments;
-create policy "tournaments_delete_authenticated" on public.tournaments for delete to authenticated using (true);
+create policy "tournaments_delete_authenticated" on public.tournaments for delete to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') is distinct from 'true'
+  and created_by = auth.uid()
+);
 
 -- pools
 drop policy if exists "pools_select_authenticated" on public.pools;
-create policy "pools_select_authenticated" on public.pools for select to authenticated using (true);
+create policy "pools_select_authenticated" on public.pools for select to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = pools.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "pools_insert_authenticated" on public.pools;
-create policy "pools_insert_authenticated" on public.pools for insert to authenticated with check (true);
+create policy "pools_insert_authenticated" on public.pools for insert to authenticated with check (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = pools.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "pools_update_authenticated" on public.pools;
-create policy "pools_update_authenticated" on public.pools for update to authenticated using (true) with check (true);
+create policy "pools_update_authenticated" on public.pools for update to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = pools.tournament_id and t.created_by = auth.uid()
+  )
+) with check (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = pools.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "pools_delete_authenticated" on public.pools;
-create policy "pools_delete_authenticated" on public.pools for delete to authenticated using (true);
+create policy "pools_delete_authenticated" on public.pools for delete to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = pools.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 -- teams
 drop policy if exists "teams_select_authenticated" on public.teams;
-create policy "teams_select_authenticated" on public.teams for select to authenticated using (true);
+create policy "teams_select_authenticated" on public.teams for select to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = teams.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "teams_insert_authenticated" on public.teams;
-create policy "teams_insert_authenticated" on public.teams for insert to authenticated with check (true);
+create policy "teams_insert_authenticated" on public.teams for insert to authenticated with check (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = teams.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "teams_update_authenticated" on public.teams;
-create policy "teams_update_authenticated" on public.teams for update to authenticated using (true) with check (true);
+create policy "teams_update_authenticated" on public.teams for update to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = teams.tournament_id and t.created_by = auth.uid()
+  )
+) with check (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = teams.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "teams_delete_authenticated" on public.teams;
-create policy "teams_delete_authenticated" on public.teams for delete to authenticated using (true);
+create policy "teams_delete_authenticated" on public.teams for delete to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = teams.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 -- schedule_templates
 drop policy if exists "schedule_templates_select_authenticated" on public.schedule_templates;
-create policy "schedule_templates_select_authenticated" on public.schedule_templates for select to authenticated using (true);
+create policy "schedule_templates_select_authenticated" on public.schedule_templates for select to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = schedule_templates.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "schedule_templates_insert_authenticated" on public.schedule_templates;
-create policy "schedule_templates_insert_authenticated" on public.schedule_templates for insert to authenticated with check (true);
+create policy "schedule_templates_insert_authenticated" on public.schedule_templates for insert to authenticated with check (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = schedule_templates.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "schedule_templates_update_authenticated" on public.schedule_templates;
-create policy "schedule_templates_update_authenticated" on public.schedule_templates for update to authenticated using (true) with check (true);
+create policy "schedule_templates_update_authenticated" on public.schedule_templates for update to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = schedule_templates.tournament_id and t.created_by = auth.uid()
+  )
+) with check (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = schedule_templates.tournament_id and t.created_by = auth.uid()
+  )
+);
 
 drop policy if exists "schedule_templates_delete_authenticated" on public.schedule_templates;
-create policy "schedule_templates_delete_authenticated" on public.schedule_templates for delete to authenticated using (true);
+create policy "schedule_templates_delete_authenticated" on public.schedule_templates for delete to authenticated using (
+  (auth.jwt() ->> 'is_anonymous') = 'true'
+  or exists (
+    select 1 from public.tournaments t
+    where t.id = schedule_templates.tournament_id and t.created_by = auth.uid()
+  )
+);
+
+-- Default created_by for email admins; lock column on update
+create or replace function public.tournaments_set_created_by()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if coalesce((auth.jwt() ->> 'is_anonymous'), 'false') = 'false'
+     and (auth.uid() is not null) then
+    if new.created_by is null then
+      new.created_by := auth.uid();
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tournaments_set_created_by_trg on public.tournaments;
+create trigger tournaments_set_created_by_trg
+before insert on public.tournaments
+for each row execute function public.tournaments_set_created_by();
+
+create or replace function public.tournaments_prevent_created_by_change()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if new.created_by is distinct from old.created_by then
+    raise exception 'created_by cannot be changed';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tournaments_lock_created_by_trg on public.tournaments;
+create trigger tournaments_lock_created_by_trg
+before update on public.tournaments
+for each row execute function public.tournaments_prevent_created_by_change();
 
 -- =========================
 -- Helpful constraints/triggers (optional)
@@ -297,3 +456,8 @@ drop trigger if exists matches_validate_live on public.matches;
 create trigger matches_validate_live
 before insert or update on public.matches
 for each row execute function public.validate_live_scores();
+
+-- Privileges for PostgREST (42501 if missing even when RLS allows the operation)
+grant usage on schema public to anon, authenticated, service_role;
+grant select on table public.tournaments to anon;
+grant select, insert, update, delete on table public.tournaments to authenticated;
