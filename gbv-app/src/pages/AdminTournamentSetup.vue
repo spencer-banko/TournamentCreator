@@ -10,6 +10,7 @@ import Button from 'primevue/button';
 import InputNumber from 'primevue/inputnumber';
 import ToggleButton from 'primevue/togglebutton';
 import supabase from '../lib/supabase';
+import { deleteTournamentConfirmOptions } from '../lib/deleteTournamentConfirm';
 import { defaultTemplateForPoolSize } from '../lib/defaultTemplates';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import AdminTournamentListPanel from '@/components/admin/AdminTournamentListPanel.vue';
@@ -173,15 +174,11 @@ function requestDeleteCurrentForm() {
   const name =
     tournamentListRef.value?.getTournaments().find((x: Tournament) => x.id === form.value.id)?.name ??
     form.value.name;
-  confirm.require({
-    message: `Delete "${name}"? This cannot be undone.`,
-    header: 'Delete tournament',
-    icon: 'pi pi-exclamation-triangle',
-    acceptClass: 'p-button-danger',
-    accept: () => {
+  confirm.require(
+    deleteTournamentConfirmOptions(name, () => {
       void executeDeleteTournament(form.value.id!);
-    },
-  });
+    })
+  );
 }
 
 // Helpers — Advancement UI

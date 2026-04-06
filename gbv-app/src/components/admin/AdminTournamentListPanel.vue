@@ -7,6 +7,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import supabase from '../../lib/supabase';
+import { deleteTournamentConfirmOptions } from '../../lib/deleteTournamentConfirm';
 import { useSessionStore } from '../../stores/session';
 import type { Tournament } from '../../types/db';
 
@@ -84,15 +85,11 @@ function editTournament(t: Tournament) {
 }
 
 function requestDeleteTournament(t: Tournament) {
-  confirm.require({
-    message: `Delete "${t.name}"? This cannot be undone.`,
-    header: 'Delete tournament',
-    icon: 'pi pi-exclamation-triangle',
-    acceptClass: 'p-button-danger',
-    accept: () => {
+  confirm.require(
+    deleteTournamentConfirmOptions(t.name, () => {
       void executeDeleteTournament(t.id);
-    },
-  });
+    })
+  );
 }
 
 async function executeDeleteTournament(id: string) {

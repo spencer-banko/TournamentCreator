@@ -6,6 +6,26 @@ import { useRoute } from 'vue-router';
 
 const route = useRoute();
 
+/** Spacing and layout for all confirmation dialogs (e.g. tournament delete). */
+const confirmDialogPt = {
+  mask: { class: 'backdrop-blur-[2px]' },
+  root: {
+    class:
+      '!max-w-lg !rounded-2xl !border !border-slate-600/60 !bg-slate-900 !shadow-2xl !ring-1 !ring-slate-700/80',
+  },
+  header: { class: '!border-b !border-slate-700/80 !px-8 !pb-4 !pt-8' },
+  title: { class: '!text-lg !font-semibold !tracking-tight !text-white' },
+  content: { class: '!flex !items-start !gap-5 !px-8 !pb-2 !pt-2' },
+  icon: { class: '!mt-0.5 !text-2xl !text-amber-400 shrink-0' },
+  message: { class: '!m-0 !text-base !leading-relaxed !text-white whitespace-pre-line' },
+  footer: {
+    class:
+      '!flex !flex-wrap !items-center !justify-center !gap-3 !border-t !border-slate-700/80 !px-8 !pb-8 !pt-6',
+  },
+  pcRejectButton: { root: { class: '!min-w-[10rem] !justify-center' } },
+  pcAcceptButton: { root: { class: '!min-w-[10rem] !justify-center' } },
+};
+
 const isGtPublicShell = computed(
   () =>
     route.meta.publicShell === true ||
@@ -59,7 +79,7 @@ watchEffect(() => {
     :class="isGtPublicShell ? 'bg-[#0b1120] text-slate-100' : 'bg-black text-white'"
   >
     <Toast />
-    <ConfirmDialog />
+    <ConfirmDialog :pt="confirmDialogPt" />
 
     <header
       v-if="!$route.meta.fullScreen && !$route.meta.adminDashboardLayout"
