@@ -138,38 +138,38 @@ onMounted(async () => {
               aria-label="Return to Tournament"
             />
             <div class="min-w-0">
-              <h2 class="text-2xl font-semibold text-white">Pools</h2>
-              <p class="mt-1 text-white/80">
+              <h2 class="text-2xl font-semibold tracking-tight text-white">Pools</h2>
+              <p class="mt-1 text-slate-400">
                 Choose a pool to view standings and schedule.
               </p>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex shrink-0 items-center gap-2">
             <router-link
               :to="{ name: 'public-leaderboard', params: { accessCode } }"
-              class="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-white/15 transition-colors whitespace-nowrap"
+              class="inline-flex items-center whitespace-nowrap rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300/95 transition-colors hover:border-amber-400/45 hover:bg-amber-500/15"
             >
               Leaderboard
             </router-link>
-            <div v-if="loading" class="text-sm text-white/80">Loading…</div>
+            <div v-if="loading" class="text-sm text-slate-400">Loading…</div>
           </div>
         </div>
 
         <div class="mt-6">
-          <div v-if="pools.length === 0" class="text-sm text-white/80">
+          <div v-if="pools.length === 0" class="text-sm text-slate-400">
             No pools yet.
           </div>
           <ul v-else class="grid gap-3 sm:grid-cols-2">
             <li
               v-for="p in pools"
               :key="p.id"
-              class="cursor-pointer rounded-xl bg-white/10 ring-1 ring-white/20 p-4 hover:bg-white/15 transition-colors text-white"
+              class="cursor-pointer rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 text-white shadow-lg shadow-black/25 transition-colors hover:border-amber-500/25 hover:bg-slate-800/65"
               @click="openPool(p.id)"
             >
               <div class="font-semibold">{{ p.name }}</div>
-              <div class="text-sm text-white/80">Court: {{ p.court_assignment || 'TBD' }}</div>
-              <div v-if="seededFirstNamesByPoolId[p.id]?.length" class="mt-1 text-xs text-white/70">
-                Players: <span class="font-medium text-white/80">{{ seededFirstNamesByPoolId[p.id].join(', ') }}</span>
+              <div class="text-sm text-slate-400">Court: {{ p.court_assignment || 'TBD' }}</div>
+              <div v-if="seededFirstNamesByPoolId[p.id]?.length" class="mt-1 text-xs text-slate-500">
+                Players: <span class="font-medium text-slate-300">{{ seededFirstNamesByPoolId[p.id].join(', ') }}</span>
               </div>
             </li>
           </ul>

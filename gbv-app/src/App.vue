@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import Toast from 'primevue/toast';
 import ConfirmDialog from 'primevue/confirmdialog';
-import { watchEffect } from 'vue';
+import { watchEffect, computed } from 'vue';
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+
+const isGtPublicShell = computed(
+  () =>
+    route.meta.publicShell === true ||
+    route.meta.adminDashboardLayout === true ||
+    route.name === 'admin-login'
+);
 
 watchEffect(() => {
   if (typeof document === 'undefined') return;
@@ -14,7 +24,9 @@ watchEffect(() => {
     'bg-gbv-blue',
     'gbv-grad-green',
     'bg-black',
+    'bg-[#0b1120]',
     'text-white',
+    'text-slate-100',
     'text-slate-800',
   ];
   for (const c of managed) {
@@ -22,13 +34,15 @@ watchEffect(() => {
     html.classList.remove(c);
   }
 
-  const pageClasses = ['bg-black', 'text-white'];
+  const pageClasses = isGtPublicShell.value
+    ? (['bg-[#0b1120]', 'text-slate-100'] as const)
+    : (['bg-black', 'text-white'] as const);
   for (const c of pageClasses) {
     body.classList.add(c);
     html.classList.add(c);
   }
 
-  const themeColor = '#000000';
+  const themeColor = isGtPublicShell.value ? '#0b1120' : '#000000';
   let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
   if (!meta) {
     meta = document.createElement('meta');
@@ -40,7 +54,10 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="min-h-full min-h-dvh flex flex-col bg-black text-white">
+  <div
+    class="min-h-full min-h-dvh flex flex-col"
+    :class="isGtPublicShell ? 'bg-[#0b1120] text-slate-100' : 'bg-black text-white'"
+  >
     <Toast />
     <ConfirmDialog />
 

@@ -78,7 +78,7 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/login',
     name: 'admin-login',
     component: () => import('../pages/AdminLogin.vue'),
-    meta: { blueLayout: true },
+    meta: { blueLayout: true, fullScreen: true },
   },
   {
     path: '/admin',

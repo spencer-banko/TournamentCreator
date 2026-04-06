@@ -29,7 +29,7 @@ function handleClick() {
 <template>
   <button
     type="button"
-    class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-white bg-white/10 ring-1 ring-white/20 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors active:scale-[0.99]"
+    class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-600/80 bg-slate-800/80 text-slate-100 shadow-sm transition-colors hover:border-amber-500/35 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50 active:scale-[0.99]"
     :aria-label="props.ariaLabel"
     :title="props.ariaLabel"
     @click="handleClick"

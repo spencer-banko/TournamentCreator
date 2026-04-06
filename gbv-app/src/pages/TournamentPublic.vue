@@ -116,50 +116,62 @@ async function saveCode() {
 
 <template>
   <!-- Hero Login (Access Code) -->
-  <section v-if="!session.accessCode" class="min-h-dvh w-full">
+  <section v-if="!session.accessCode" class="relative min-h-dvh w-full overflow-hidden bg-[#0b1120] text-slate-100">
     <div
-      class="min-h-dvh w-full flex items-center justify-center px-4 py-12 bg-black"
-    >
+      class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/12 blur-3xl"
+      aria-hidden="true"
+    />
+    <div
+      class="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-[#2d51a6]/20 blur-3xl"
+      aria-hidden="true"
+    />
+    <div class="relative z-10 flex min-h-dvh w-full items-center justify-center px-4 py-12">
       <div class="w-full max-w-xl">
         <div class="text-center">
-              <div class="flex flex-col items-center mb-8">
-              <img 
-                src="@/assets/GBVLogo.png"
-                alt="GTBV Logo"
-                class="w-[68vw] sm:w-[60vw] md:w-[48vw] max-w-[512px] h-auto max-h-[32vh] drop-shadow-xl"
-              />
-              <img
-                src="@/assets/GatorBeachVolleyball.png"
-                alt="GT Beach Volleyball"
-                class="w-[68vw] sm:w-[60vw] md:w-[48vw] max-w-[512px] h-auto mt-4 drop-shadow-xl"
-              />
-              </div>
-          <h1 class="text-white text-3xl sm:text-4xl font-extrabold drop-shadow-md">
+          <div class="mb-8 flex flex-col items-center">
+            <img
+              src="@/assets/GBVLogo.png"
+              alt="GTBV Logo"
+              class="mx-auto block h-auto max-h-[32vh] w-auto max-w-[min(512px,90vw)] object-contain drop-shadow-xl"
+            />
+            <img
+              src="@/assets/GatorBeachVolleyball.png"
+              alt="GT Beach Volleyball"
+              class="mx-auto mt-4 block h-auto max-h-[32vh] w-auto max-w-[min(512px,90vw)] object-contain drop-shadow-xl"
+            />
+          </div>
+          <h1 class="text-3xl font-extrabold tracking-tight text-white drop-shadow-md sm:text-4xl">
             Enter the tournament code to continue.
           </h1>
+          <p class="mt-3 text-base text-slate-400 sm:text-lg">Pool play, bracket, and live scores — one code away.</p>
         </div>
 
-        <div class="mt-8 rounded-2xl bg-white/10 p-4 sm:p-6 backdrop-blur-md ring-1 ring-white/20">
+        <div
+          class="public-hero-card mt-8 rounded-2xl border border-slate-600/45 bg-gradient-to-br from-slate-800/90 via-slate-800/75 to-[#1a2740]/95 p-4 shadow-xl shadow-black/30 backdrop-blur-sm sm:p-6"
+        >
           <label class="sr-only">Tournament Access Code</label>
-          <div class="flex flex-col sm:flex-row gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row">
             <InputText
               v-model="accessCodeInput"
               placeholder="e.g. GOJACKETS"
-              class="w-full !rounded-2xl !px-5 !py-4 !text-xl !bg-white/95 !shadow-lg text-gray-900"
+              class="w-full !rounded-2xl !border-slate-300/90 !px-5 !py-4 !text-xl !bg-white !shadow-lg !text-slate-900"
             />
             <Button
               label="Continue"
               icon="pi pi-arrow-right"
               @click="saveCode"
-              class="!rounded-2xl !px-6 !py-4 !text-xl !font-semibold !shadow-lg border-none text-white bg-gbv-dark-green"
-              />
+              class="!rounded-2xl !px-6 !py-4 !text-xl !font-semibold !shadow-lg border-none text-white gbv-grad-blue"
+            />
           </div>
-          <p class="mt-3 text-white/90 text-sm">
-            Access code is provided by the president.
-          </p>
-          <div class="mt-3 text-center text-sm text-white/90">
+          <p class="mt-3 text-sm text-slate-400">Access code is provided by the president.</p>
+          <div class="mt-3 text-center text-sm text-slate-400">
             Admin? Go to
-            <router-link class="underline" :to="{ name: 'admin-login' }">Admin Login</router-link>
+            <router-link
+              class="font-medium text-amber-400/90 underline decoration-amber-500/40 underline-offset-2 hover:text-amber-300"
+              :to="{ name: 'admin-login' }"
+            >
+              Admin Login
+            </router-link>
           </div>
         </div>
       </div>
@@ -171,37 +183,49 @@ async function saveCode() {
     <section class="p-5 sm:p-7">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <h2 class="text-2xl font-semibold text-white">Tournament</h2>
-          <p class="mt-1 text-white/80">
+          <h2 class="text-2xl font-semibold tracking-tight text-white">Tournament</h2>
+          <p class="mt-1 text-slate-400">
             Redirecting you to Pools or Bracket based on tournament phase…
           </p>
         </div>
-        <div v-if="loading" class="text-sm text-white/80">Loading…</div>
+        <div v-if="loading" class="text-sm text-slate-400">Loading…</div>
       </div>
-
 
       <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <router-link
           :to="{ name: 'public-pool-list', params: { accessCode: session.accessCode } }"
-          class="rounded-xl bg-white/10 ring-1 ring-white/20 p-5 text-center hover:bg-white/15 transition-colors"
+          class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-5 text-center shadow-lg shadow-black/25 transition-colors hover:border-amber-500/25 hover:bg-slate-800/65"
         >
           <div class="text-lg font-semibold text-white">Go to Pools</div>
-          <div class="mt-1 text-sm text-white/80">Standings & schedule</div>
+          <div class="mt-1 text-sm text-slate-400">Standings & schedule</div>
         </router-link>
 
         <router-link
           :to="{ name: 'public-bracket', params: { accessCode: session.accessCode } }"
-          class="rounded-xl bg-white/10 ring-1 ring-white/20 p-5 text-center hover:bg-white/15 transition-colors"
+          class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-5 text-center shadow-lg shadow-black/25 transition-colors hover:border-amber-500/25 hover:bg-slate-800/65"
         >
           <div class="text-lg font-semibold text-white">Go to Bracket</div>
-          <div class="mt-1 text-sm text-white/80">Playoff bracket</div>
+          <div class="mt-1 text-sm text-slate-400">Playoff bracket</div>
         </router-link>
       </div>
 
-      <div class="mt-6 text-center text-sm text-white/80">
+      <div class="mt-6 text-center text-sm text-slate-400">
         Admin? Go to
-        <router-link class="underline" :to="{ name: 'admin-login' }">Admin Login</router-link>
+        <router-link
+          class="font-medium text-amber-400/90 underline decoration-amber-500/40 underline-offset-2 hover:text-amber-300"
+          :to="{ name: 'admin-login' }"
+        >
+          Admin Login
+        </router-link>
       </div>
     </section>
   </PublicLayout>
 </template>
+
+<style scoped>
+.public-hero-card {
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.06),
+    0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+</style>

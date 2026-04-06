@@ -159,25 +159,27 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-full min-h-dvh w-full">
-    <!-- Public Header (green primary) -->
+  <div class="min-h-full min-h-dvh w-full bg-[#0b1120] text-slate-100">
+    <!-- Public Header (GT navy + gold accents, aligned with admin dashboard) -->
     <header
       :class="stickyHeader ? 'sticky top-0 z-50' : ''"
       aria-label="Public tournament header"
     >
-      <div class="bg-black text-white shadow-md border-b border-white/10">
-        <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3 min-w-0">
+      <div
+        class="border-b border-slate-700/60 bg-slate-800/90 text-slate-100 shadow-sm shadow-black/20 backdrop-blur-md"
+      >
+        <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div class="flex min-w-0 items-center gap-3">
             <img
               src="@/assets/GBVLogo.png"
               alt="GTBV"
               class="h-8 w-auto drop-shadow-md"
             />
             <div class="min-w-0">
-              <div class="text-white font-extrabold tracking-tight truncate">
+              <div class="truncate font-extrabold tracking-tight text-white">
                 {{ tournamentName }}
               </div>
-              <div v-if="tournamentPhase" class="text-[11px] text-white/85">
+              <div v-if="tournamentPhase" class="text-[11px] text-slate-400">
                 {{ tournamentPhase }}
               </div>
             </div>
@@ -188,7 +190,7 @@ onBeforeUnmount(() => {
               <button
                 ref="menuButtonEl"
                 type="button"
-                class="gbv-pressable rounded-2xl px-3 py-2 text-left ring-1 ring-white/20 bg-white/10 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 transition-colors"
+                class="gbv-pressable rounded-2xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-left text-slate-100 shadow-sm transition hover:border-amber-500/35 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
                 aria-label="Tournament access code menu"
                 aria-haspopup="menu"
                 :aria-expanded="menuOpen ? 'true' : 'false'"
@@ -196,11 +198,11 @@ onBeforeUnmount(() => {
               >
                 <div class="flex items-center gap-2">
                   <div class="min-w-0">
-                    <div class="text-[11px] leading-tight text-white/80">Code</div>
-                    <div class="font-mono font-semibold leading-tight truncate">{{ accessCode }}</div>
+                    <div class="text-[11px] leading-tight text-slate-400">Code</div>
+                    <div class="truncate font-mono font-semibold leading-tight text-white">{{ accessCode }}</div>
                   </div>
                   <i
-                    class="pi text-white/90"
+                    class="pi text-slate-400"
                     :class="menuOpen ? 'pi-chevron-up' : 'pi-chevron-down'"
                     aria-hidden="true"
                   />
