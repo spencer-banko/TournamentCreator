@@ -264,8 +264,12 @@ export async function computePoolStandings(tournamentId: string): Promise<Map<st
 }
 
 /**
- * Build the ordered seed list S = winners (globally ranked) + runners-up (globally ranked).
- * Returns array of team IDs in seed order (1-based).
+ * Build the ordered seed list S: all advancers sorted by global standing (same rules as leaderboard).
+ * Seed #1 = best overall, #2 = second overall, etc., so standard bracket slotting puts 1 vs 8, 2 vs 7, …
+ * and keeps top teams on opposite halves until late rounds.
+ *
+ * `winners` / `runners` are still all pool 1st-place / 2nd-place advancers, each sub-sorted globally
+ * (for callers that need that breakdown).
  */
 export async function seedAdvancers(tournamentId: string): Promise<{ seeds: UUID[]; winners: UUID[]; runners: UUID[] }> {
   const standingsByPool = await computePoolStandings(tournamentId);
@@ -292,31 +296,33 @@ export async function seedAdvancers(tournamentId: string): Promise<{ seeds: UUID
     return a.name.localeCompare(b.name);
   }
 
-  // Bucket teams by finish position: 1st across pools, then 2nd across pools, then 3rd (for 5-team pools), etc.
+  type Advancer = { standing: Standing; poolFinish: number };
+
   const poolIds = Array.from(standingsByPool.keys());
-  const buckets: Standing[][] = [];
+  const advancers: Advancer[] = [];
 
   for (const pid of poolIds) {
     const standings = standingsByPool.get(pid) ?? [];
     const size = standings.length;
     const advCount = advMap.get(size) ?? 0;
     for (let pos = 0; pos < advCount; pos++) {
-      if (!buckets[pos]) buckets[pos] = [];
-      if (standings[pos]) buckets[pos].push(standings[pos]);
+      if (standings[pos]) {
+        advancers.push({ standing: standings[pos], poolFinish: pos });
+      }
     }
   }
 
-  const orderedGroups: UUID[][] = [];
-  for (const group of buckets) {
-    if (!group || group.length === 0) continue;
-    orderedGroups.push(group.sort(cmpGlobal).map((s) => s.teamId));
-  }
+  advancers.sort((a, b) => cmpGlobal(a.standing, b.standing));
+  const seeds = advancers.map((a) => a.standing.teamId);
 
-  const seeds = ([] as UUID[]).concat(...orderedGroups);
-
-  // For backwards compatibility, expose first two layers as winners/runners (may be empty arrays if not applicable)
-  const winners = orderedGroups[0] ?? [];
-  const runners = orderedGroups[1] ?? [];
+  const winners = advancers
+    .filter((a) => a.poolFinish === 0)
+    .sort((a, b) => cmpGlobal(a.standing, b.standing))
+    .map((a) => a.standing.teamId);
+  const runners = advancers
+    .filter((a) => a.poolFinish === 1)
+    .sort((a, b) => cmpGlobal(a.standing, b.standing))
+    .map((a) => a.standing.teamId);
 
   return { seeds, winners, runners };
 }
@@ -904,6 +910,48 @@ export async function rebuildBracket(tournamentId: string): Promise<{ inserted: 
 
   // Generate again
   return await generateBracket(tournamentId);
+}
+
+/**
+ * Delete all bracket matches and revert tournament phase back to pool play.
+ */
+export async function deleteBracketAndRevertToPoolPlay(tournamentId: string): Promise<{ deleted: number; errors: string[] }> {
+  const errors: string[] = [];
+  let deleted = 0;
+
+  const { data: existingRows, error: countErr } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('tournament_id', tournamentId)
+    .eq('match_type', 'bracket');
+  if (countErr) {
+    errors.push(`Failed to inspect existing bracket matches: ${countErr.message}`);
+  } else {
+    deleted = (existingRows ?? []).length;
+  }
+
+  const { error: deleteErr } = await supabase
+    .from('matches')
+    .delete()
+    .eq('tournament_id', tournamentId)
+    .eq('match_type', 'bracket');
+  if (deleteErr) {
+    errors.push(`Failed to delete bracket matches: ${deleteErr.message}`);
+  }
+
+  const { error: updateErr } = await supabase
+    .from('tournaments')
+    .update({
+      status: 'pool_play',
+      bracket_started: false,
+      bracket_generated_at: null,
+    })
+    .eq('id', tournamentId);
+  if (updateErr) {
+    errors.push(`Failed to revert tournament phase: ${updateErr.message}`);
+  }
+
+  return { deleted, errors };
 }
 
 // --- Auto-advance winner into next round helper (appended) ---

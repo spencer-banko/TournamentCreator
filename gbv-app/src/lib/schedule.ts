@@ -292,3 +292,4 @@ export async function generateSchedule(tournamentId: string): Promise<GenerateRe
 
   return { inserted: totalInserted, errors };
 }
+

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import InputText from 'primevue/inputtext';
@@ -25,6 +25,7 @@ const accessCode = ref<string>(session.accessCode ?? '');
 const loading = ref(false);
 const checking = ref(false);
 const generating = ref(false);
+const resettingScores = ref(false);
 
 const prereqErrors = ref<string[]>([]);
 const hasMatches = ref<boolean>(false);
@@ -155,6 +156,61 @@ async function runGenerate() {
     generating.value = false;
   }
 }
+
+async function resetPoolMatchScores() {
+  if (!session.tournament) {
+    toast.add({ severity: 'warn', summary: 'Load a tournament first', life: 1500 });
+    return;
+  }
+
+  const ok = confirm(
+    'Reset all pool match scores for this tournament? This will clear submitted and live scores, and cannot be undone.'
+  );
+  if (!ok) return;
+
+  resettingScores.value = true;
+  try {
+    const { data, error } = await supabase
+      .from('matches')
+      .update({
+        team1_score: null,
+        team2_score: null,
+        winner_id: null,
+        is_live: false,
+        live_score_team1: null,
+        live_score_team2: null,
+        live_owner_id: null,
+        live_last_active_at: null,
+      })
+      .eq('tournament_id', session.tournament.id)
+      .eq('match_type', 'pool')
+      .select('id');
+
+    if (error) {
+      toast.add({ severity: 'error', summary: 'Reset failed', detail: error.message, life: 3000 });
+      return;
+    }
+
+    const updatedCount = Array.isArray(data) ? data.length : 0;
+    if (updatedCount === 0) {
+      toast.add({ severity: 'warn', summary: 'No pool matches found to reset', life: 2200 });
+    } else {
+      toast.add({ severity: 'success', summary: `Reset scores for ${updatedCount} pool match(es)`, life: 2200 });
+    }
+    await checkExistingMatches();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Reset failed', detail: err?.message ?? 'Unknown error', life: 3000 });
+  } finally {
+    resettingScores.value = false;
+  }
+}
+
+onMounted(async () => {
+  if (!session.tournament) return;
+  await checkExistingMatches();
+  await refreshPrereqs();
+});
+
 </script>
 
 <template>
@@ -230,16 +286,30 @@ async function runGenerate() {
               :pt="adminBtnPillPt"
               @click="runGenerate"
             />
-            <Button
+            <div class="rounded-xl border border-red-500/45 bg-red-500/10 p-3 shadow-lg shadow-red-950/25">
+              <Button
+                :loading="resettingScores"
+                label="Reset Scores"
+                icon="pi pi-refresh"
+                :class="adminBtnDangerPillClass"
+                :pt="adminBtnPillPt"
+                @click="resetPoolMatchScores"
+              />
+            </div>
+            <div
               v-if="hasMatches"
-              :loading="generating"
-              label="Delete Existing Pool Matches"
-              icon="pi pi-trash"
-              severity="danger"
-              :class="adminBtnDangerPillClass"
-              :pt="adminBtnPillPt"
-              @click="deleteExistingPoolMatches"
-            />
+              class="rounded-xl border border-red-500/45 bg-red-500/10 p-3 shadow-lg shadow-red-950/25"
+            >
+              <Button
+                :loading="generating"
+                label="Delete Existing Pool Matches"
+                icon="pi pi-trash"
+                severity="danger"
+                :class="adminBtnDangerPillClass"
+                :pt="adminBtnPillPt"
+                @click="deleteExistingPoolMatches"
+              />
+            </div>
           </div>
         </div>
       </div>

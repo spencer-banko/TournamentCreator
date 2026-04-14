@@ -281,7 +281,10 @@ function computeStandings() {
     // 1) wins desc
     if (b.wins !== a.wins) return b.wins - a.wins;
 
-    // 2) head-to-head if exactly two-way tie
+    // 2) point diff desc (primary tiebreaker for equal records)
+    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+
+    // 3) head-to-head if exactly two-way tie
     const tiedSameWins = arr.filter((x) => x.wins === a.wins);
     if (tiedSameWins.length >= 2) {
       // if only a and b in this tie group, use head-to-head
@@ -292,11 +295,8 @@ function computeStandings() {
       }
     }
 
-    // 3) set ratio desc
+    // 4) set ratio desc
     if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
-
-    // 4) point diff desc
-    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
 
     // 5) seed asc if both available (earlier seed better)
     if (a.seed != null && b.seed != null && a.seed !== b.seed) return a.seed - b.seed;

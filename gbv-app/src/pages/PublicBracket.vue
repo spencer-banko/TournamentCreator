@@ -38,6 +38,10 @@ const toast = useToast();
 
 const accessCode = computed(() => (route.params.accessCode as string) ?? session.accessCode ?? '');
 const loading = ref(false);
+const hasBracket = computed(() => {
+  const t = session.tournament;
+  return !!t && (t.status === 'bracket' || t.status === 'completed' || !!t.bracket_generated_at);
+});
 
 const bracketChromeHidden = ref(false);
 const mobileBracketOffsetPx = computed(() => (bracketChromeHidden.value ? 110 : 200));
@@ -195,6 +199,11 @@ onMounted(async () => {
   loading.value = true;
   try {
     await ensureTournament();
+    if (!hasBracket.value) {
+      toast.add({ severity: 'info', summary: 'Bracket is locked', detail: 'The bracket will unlock after it is generated.', life: 2500 });
+      await router.replace({ name: 'public-pool-list', params: { accessCode: accessCode.value } });
+      return;
+    }
     await loadTeams();
     await loadMatches();
     await loadCourts();
@@ -223,6 +232,20 @@ onBeforeUnmount(async () => {
       class="px-5 sm:px-7 pb-2"
       :class="bracketChromeHidden ? 'pt-2 sm:pt-3' : 'pt-5 sm:pt-7'"
     >
+      <div v-show="!bracketChromeHidden" class="mb-4 flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 p-2">
+        <router-link
+          :to="{ name: 'public-pool-list', params: { accessCode } }"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10"
+        >
+          Pool Play
+        </router-link>
+        <router-link
+          :to="{ name: 'public-bracket', params: { accessCode } }"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold bg-amber-400/20 text-amber-100 ring-1 ring-amber-300/45"
+        >
+          Bracket
+        </router-link>
+      </div>
       <div v-show="!bracketChromeHidden" class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-2xl font-semibold text-white">Bracket</h2>

@@ -10,7 +10,7 @@ import ToggleButton from 'primevue/togglebutton';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
-import { generateBracket, rebuildBracket, checkBracketPrerequisites, type BracketPrereqReport } from '../lib/bracket';
+import { generateBracket, rebuildBracket, checkBracketPrerequisites, deleteBracketAndRevertToPoolPlay, type BracketPrereqReport } from '../lib/bracket';
 import { fillRandomPoolScores } from '../lib/testData';
 import {
   adminBtnPillPt,
@@ -296,6 +296,30 @@ async function doRebuild() {
   }
 }
 
+async function doDeleteBracket() {
+  if (!session.tournament) {
+    toast.add({ severity: 'warn', summary: 'Load a tournament first', life: 1500 });
+    return;
+  }
+  const confirmed = confirm('Delete bracket? This will remove all bracket matches and revert the tournament to Pool Play. This cannot be undone. Continue?');
+  if (!confirmed) return;
+  running.value = true;
+  try {
+    const res = await deleteBracketAndRevertToPoolPlay(session.tournament.id);
+    if (res.errors.length === 0) {
+      toast.add({ severity: 'success', summary: `Deleted bracket (${res.deleted} match(es)) and reverted to Pool Play`, life: 3000 });
+    } else {
+      toast.add({ severity: 'warn', summary: `Delete completed with ${res.errors.length} issue(s)`, detail: res.errors[0], life: 4000 });
+      console.warn('deleteBracketAndRevertToPoolPlay errors:', res.errors);
+    }
+    await loadMatches();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Delete failed', detail: err?.message ?? 'Unknown error', life: 3000 });
+  } finally {
+    running.value = false;
+  }
+}
+
 async function doCheckPrereq() {
   if (!session.tournament) {
     toast.add({ severity: 'warn', summary: 'Load a tournament first', life: 1500 });
@@ -501,6 +525,15 @@ onBeforeUnmount(() => {
               :class="adminBtnOrangePillClass"
               :pt="adminBtnPillPt"
               @click="doRebuild"
+            />
+            <Button
+              :loading="running"
+              label="Delete Bracket"
+              icon="pi pi-trash"
+              severity="danger"
+              :pt="adminBtnPillPt"
+              class="!w-full !justify-center !rounded-full !border !border-red-400/45 !bg-red-600/85 !px-5 !py-3 !font-semibold !text-white shadow-md shadow-red-900/30 transition-all duration-150 hover:!border-red-300/65 hover:!bg-red-500/90 disabled:!opacity-70"
+              @click="doDeleteBracket"
             />
             <div
               class="mt-2 flex w-full items-center justify-between gap-4 rounded-full border border-slate-600/55 bg-slate-800/65 py-2 pl-5 pr-2 shadow-inner shadow-black/25"

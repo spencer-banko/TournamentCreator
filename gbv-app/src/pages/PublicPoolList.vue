@@ -30,6 +30,10 @@ const accessCode = computed(() => (route.params.accessCode as string) ?? session
 const loading = ref(false);
 const pools = ref<Pool[]>([]);
 const seededFirstNamesByPoolId = ref<Record<string, string[]>>({});
+const hasBracket = computed(() => {
+  const t = session.tournament;
+  return !!t && (t.status === 'bracket' || t.status === 'completed' || !!t.bracket_generated_at);
+});
 
 async function ensureTournament() {
   if (!accessCode.value) return;
@@ -130,6 +134,31 @@ onMounted(async () => {
 <template>
   <PublicLayout>
     <section class="p-5 sm:p-7">
+        <div class="mb-4 flex items-center gap-2 rounded-xl border border-slate-600/45 bg-slate-800/45 p-2">
+          <router-link
+            :to="{ name: 'public-pool-list', params: { accessCode } }"
+            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+            :class="'bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/35'"
+          >
+            Pool Play
+          </router-link>
+          <router-link
+            v-if="hasBracket"
+            :to="{ name: 'public-bracket', params: { accessCode } }"
+            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-700/60"
+          >
+            Bracket
+          </router-link>
+          <button
+            v-else
+            type="button"
+            class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-400 ring-1 ring-slate-500/35"
+            @click.prevent
+          >
+            <i class="pi pi-lock text-xs" aria-hidden="true" />
+            Bracket
+          </button>
+        </div>
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-start gap-3 min-w-0">
             <UiBackButton

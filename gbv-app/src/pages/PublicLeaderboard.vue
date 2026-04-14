@@ -191,8 +191,8 @@ function computeStandings() {
   const arr = Object.values(base);
   arr.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
-    if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
     if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+    if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
     if (a.seed != null && b.seed != null && a.seed !== b.seed) return a.seed - b.seed;
     return a.name.localeCompare(b.name);
   });
