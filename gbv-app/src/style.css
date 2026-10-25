@@ -1,24 +1,27 @@
 @import "tailwindcss";
 
-/* Theme tokens (Tailwind v4) - updated to requested palette */
+/* Theme tokens (Tailwind v4) — GT defaults; overridden at runtime via :root[data-theme] in themes.css */
 @theme {
-  --color-gbv-blue: #2d51a6;   /* Blue */
-  --color-gbv-orange: #faa237; /* Orange */
-  --color-gbv-green: #6cc451;  /* Green */
-  --color-gbv-dark-green: #1b6a08; /* Dark Green */
-  --color-gbv-sand: #ede0d1;   /* Sand */
-  --color-gbv-bg: #ede0d1;     /* Background */
-  --color-gbv-ink: #0f172a;    /* High-contrast ink */
+  --color-gbv-blue: #2d51a6;
+  --color-gbv-orange: #faa237;
+  --color-gbv-green: #6cc451;
+  --color-gbv-dark-green: #1b6a08;
+  --color-gbv-sand: #ede0d1;
+  --color-gbv-bg: #ede0d1;
+  --color-gbv-ink: #0f172a;
 }
 
-/* Gradient helpers for modern material styling */
-.gbv-gradient-green {
-  background-image: linear-gradient(135deg, #468d31 0%, #51923d 70%);
+/* Page shell background — replaces hardcoded bg-[#0b1120] */
+.gbv-page-bg { background: var(--brand-page-bg); }
+
+/* Sticky header background — replaces hardcoded bg-slate-800/90 */
+.gbv-header-bg { background-color: var(--brand-header-bg); }
+
+/* Brand-coloured decorative glow blob (replaces hardcoded bg-[#2d51a6]/20) */
+.gbv-blob-primary {
+  background-color: rgba(var(--brand-blob), 0.20);
 }
 
-.gbv-gradient-primary {
-  background-image: linear-gradient(135deg, #2d51a6 0%, #faa237 100%);
-}
 /* Base layout helpers */
 html, body, #app { height: 100%; }
 
@@ -33,13 +36,13 @@ body {
 
 /* Mild same-color gradients */
 .gbv-grad-green {
-  background-color: #499237;
-  background-image: linear-gradient(135deg, #499237 0%, #539a3e 100%);
+  background-color: var(--brand-accent);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--brand-accent) 85%, #000) 0%, var(--brand-accent) 100%);
 }
 
 .gbv-grad-dark-green {
-  background-color: #1b6a08;
-  background-image: linear-gradient(135deg, #1b6a08 0%, #29820c 100%);
+  background-color: var(--brand-accent-dark);
+  background-image: linear-gradient(135deg, var(--brand-accent-dark) 0%, color-mix(in srgb, var(--brand-accent-dark) 75%, #fff) 100%);
 }
 
 /* PrimeVue Toast — dark surfaces + light text (readable on black app shell; fixes error white-on-white) */
@@ -108,22 +111,21 @@ body {
 }
 
 .gbv-grad-blue {
-  background-color: #2d51a6;
-  background-image: linear-gradient(135deg, #244695 0%, #2d51a6 100%);
+  background-color: var(--brand-primary);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 85%, #000) 0%, var(--brand-primary) 100%);
 }
 
 .gbv-grad-orange {
-  background-image: linear-gradient(135deg, #f5931a 0%, #faa237 100%);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--brand-secondary) 88%, #000) 0%, var(--brand-secondary) 100%);
 }
 
-/* Backward compat: keep name but switch to same-color gradient */
+/* Backward compat: keep names, values now driven by brand CSS vars */
 .gbv-gradient-green {
-  background-image: linear-gradient(135deg, #5fb948 0%, #6cc451 100%);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--brand-accent) 88%, #000) 0%, var(--brand-accent) 100%);
 }
 
-/* Primary previously mixed colors; now use blue-only mild gradient */
 .gbv-gradient-primary {
-  background-image: linear-gradient(135deg, #244695 0%, #2d51a6 100%);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 85%, #000) 0%, var(--brand-primary) 100%);
 }
 
 
@@ -133,7 +135,7 @@ body {
   --gbv-radius-pill: 999px;
   --gbv-shadow-card: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
   --gbv-shadow-hover: 0 12px 20px -6px rgba(0,0,0,0.15), 0 6px 10px -4px rgba(0,0,0,0.08);
-  --gbv-focus-green: #1b6a08;
+  --gbv-focus-green: var(--brand-accent-dark);
 }
 
 /* Card utility (opt-in; complements Tailwind classes used in pages) */

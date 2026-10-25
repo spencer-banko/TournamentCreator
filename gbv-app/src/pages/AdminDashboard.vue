@@ -13,6 +13,7 @@ import UiListItem from '@/components/ui/UiListItem.vue';
 import AdminTournamentListPanel from '@/components/admin/AdminTournamentListPanel.vue';
 import supabase from '../lib/supabase';
 import { useToast } from 'primevue/usetoast';
+import { brand } from '../lib/brand';
 
 const router = useRouter();
 const session = useSessionStore();
@@ -251,15 +252,20 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-dashboard-shell min-h-dvh flex flex-col bg-[#0b1120] text-slate-100">
+  <div class="admin-dashboard-shell min-h-dvh flex flex-col gbv-page-bg text-slate-100">
     <!-- Top navigation -->
     <header
-      class="w-full shrink-0 border-b border-slate-700/60 bg-slate-800/90 shadow-sm shadow-black/20 backdrop-blur-md"
+      class="w-full shrink-0 border-b border-slate-700/60 gbv-header-bg shadow-sm shadow-black/20 backdrop-blur-md"
     >
       <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div class="min-w-0">
+        <div class="flex min-w-0 items-center gap-3">
+          <img
+            :src="brand.logoUrl"
+            :alt="brand.appName"
+            class="h-8 w-auto shrink-0 drop-shadow-md"
+          />
           <div class="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
-            GT Beach Volleyball
+            {{ brand.appName }}
             <span
               class="ml-2 inline-block rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-amber-400/95"
             >

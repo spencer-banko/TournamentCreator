@@ -3,6 +3,7 @@ import Toast from 'primevue/toast';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { watchEffect, computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { brand } from './lib/brand';
 
 const route = useRoute();
 
@@ -44,7 +45,7 @@ watchEffect(() => {
     'bg-gbv-blue',
     'gbv-grad-green',
     'bg-black',
-    'bg-[#0b1120]',
+    'gbv-page-bg',
     'text-white',
     'text-slate-100',
     'text-slate-800',
@@ -55,14 +56,14 @@ watchEffect(() => {
   }
 
   const pageClasses = isGtPublicShell.value
-    ? (['bg-[#0b1120]', 'text-slate-100'] as const)
+    ? (['gbv-page-bg', 'text-slate-100'] as const)
     : (['bg-black', 'text-white'] as const);
   for (const c of pageClasses) {
     body.classList.add(c);
     html.classList.add(c);
   }
 
-  const themeColor = isGtPublicShell.value ? '#0b1120' : '#000000';
+  const themeColor = isGtPublicShell.value ? getComputedStyle(document.documentElement).getPropertyValue('--brand-page-bg').trim() || '#0b1120' : '#000000';
   let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
   if (!meta) {
     meta = document.createElement('meta');
@@ -76,7 +77,7 @@ watchEffect(() => {
 <template>
   <div
     class="min-h-full min-h-dvh flex flex-col"
-    :class="isGtPublicShell ? 'bg-[#0b1120] text-slate-100' : 'bg-black text-white'"
+    :class="isGtPublicShell ? 'gbv-page-bg text-slate-100' : 'bg-black text-white'"
   >
     <Toast />
     <ConfirmDialog :pt="confirmDialogPt" />
@@ -87,7 +88,7 @@ watchEffect(() => {
     >
       <div class="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
         <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">
-          GT Beach Volleyball
+          {{ brand.appName }}
         </h1>
       </div>
     </header>
@@ -107,7 +108,7 @@ watchEffect(() => {
       :class="$route.meta.blueLayout ? 'border-t border-white/15 text-sm text-white/80 bg-transparent' : 'border-t border-white/15 text-sm text-white/80 bg-transparent'"
     >
       <div class="mx-auto max-w-6xl px-4 py-4">
-        © 2025 GT Beach Volleyball
+        © 2025 {{ brand.appName }}
       </div>
     </footer>
   </div>

@@ -441,7 +441,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="admin-bracket-page -mx-4 min-h-dvh bg-[#0b1120] px-4 py-8 text-slate-100">
+  <div class="admin-bracket-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-slate-100">
     <UiSectionHeading
       variant="dashboard"
       title="Admin Bracket"

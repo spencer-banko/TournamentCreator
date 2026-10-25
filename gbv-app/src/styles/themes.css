@@ -1,0 +1,68 @@
+/*
+ * Brand theme tokens.
+ *
+ * Selectors use :root[data-theme] (specificity 0,2,0) so they beat the
+ * Tailwind @theme output on :root (specificity 0,1,0), regardless of
+ * import order.
+ *
+ * Each block defines:
+ *   --brand-*          consumed by gradient helper classes in style.css
+ *   --color-gbv-*      override the Tailwind gbv color tokens (bg-gbv-blue etc.)
+ *   --color-amber-*    override Tailwind's amber palette — the UI-wide accent
+ *                      color used for hover borders, focus rings, links, badges,
+ *                      and decorative glows throughout every component
+ */
+
+:root[data-theme="gt"] {
+  /* Brand primitives */
+  --brand-primary:     #2d51a6;
+  --brand-secondary:   #faa237;
+  --brand-accent:      #6cc451;
+  --brand-accent-dark: #1b6a08;
+  --brand-surface:     #ede0d1;
+  --brand-bg:          #ede0d1;
+  --brand-ink:         #0f172a;
+
+  /* Page & header shell colors */
+  --brand-page-bg:    #0b1120;
+  --brand-header-bg:  rgba(30, 41, 59, 0.90);   /* slate-800/90 */
+
+  /* Tailwind gbv token overrides */
+  --color-gbv-blue:       #2d51a6;
+  --color-gbv-orange:     #faa237;
+  --color-gbv-green:      #6cc451;
+  --color-gbv-dark-green: #1b6a08;
+  --color-gbv-sand:       #ede0d1;
+  --color-gbv-bg:         #ede0d1;
+  --color-gbv-ink:        #0f172a;
+
+  /* Branded glow blob */
+  --brand-blob: 45, 81, 166; /* #2d51a6 as R G B for rgba() */
+}
+
+:root[data-theme="ecva"] {
+  /* Brand primitives */
+  --brand-primary:     #003366;
+  --brand-secondary:   #cc0000;
+  --brand-accent:      #0077cc;
+  --brand-accent-dark: #004488;
+  --brand-surface:     #f0f4f8;
+  --brand-bg:          #f0f4f8;
+  --brand-ink:         #0f172a;
+
+  /* Page & header shell colors — ECVA navy-to-red diagonal gradient */
+  --brand-page-bg:    linear-gradient(135deg, #001a3a 0%, #001030 55%, #3d0000 100%);
+  --brand-header-bg:  rgba(0, 20, 60, 0.92);
+
+  /* Tailwind gbv token overrides */
+  --color-gbv-blue:       #003366;
+  --color-gbv-orange:     #cc0000;
+  --color-gbv-green:      #0077cc;
+  --color-gbv-dark-green: #004488;
+  --color-gbv-sand:       #f0f4f8;
+  --color-gbv-bg:         #f0f4f8;
+  --color-gbv-ink:        #0f172a;
+
+  /* Branded glow blob */
+  --brand-blob: 0, 51, 102; /* #003366 as R G B */
+}

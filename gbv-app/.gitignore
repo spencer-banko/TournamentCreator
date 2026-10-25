@@ -22,5 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
+# Ignore all env files; allow only example templates
+.env*
+!.env.example
+!.env.*.example
 PRD.md

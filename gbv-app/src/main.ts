@@ -6,9 +6,12 @@ import 'primeicons/primeicons.css';
 import ToastService from 'primevue/toastservice';
 import ConfirmationService from 'primevue/confirmationservice';
 import router from './router';
+import './styles/themes.css';
 import './style.css';
 import './styles/bracket-theme.css';
 import App from './App.vue';
+
+document.documentElement.setAttribute('data-theme', import.meta.env.VITE_BRAND ?? 'gt');
 
 const app = createApp(App);
 

@@ -1050,7 +1050,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh bg-[#0b1120] px-4 py-8 text-slate-100">
+  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-slate-100">
     <div class="mx-auto max-w-7xl">
     <UiSectionHeading
       variant="dashboard"

@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import { useToast } from 'primevue/usetoast';
 import PublicLayout from '../components/layout/PublicLayout.vue';
+import { brand } from '../lib/brand';
 
 
 const toast = useToast();
@@ -116,13 +117,13 @@ async function saveCode() {
 
 <template>
   <!-- Hero Login (Access Code) -->
-  <section v-if="!session.accessCode" class="relative min-h-dvh w-full overflow-hidden bg-[#0b1120] text-slate-100">
+  <section v-if="!session.accessCode" class="relative min-h-dvh w-full overflow-hidden gbv-page-bg text-slate-100">
     <div
       class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/12 blur-3xl"
       aria-hidden="true"
     />
     <div
-      class="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-[#2d51a6]/20 blur-3xl"
+      class="gbv-blob-primary pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full blur-3xl"
       aria-hidden="true"
     />
     <div class="relative z-10 flex min-h-dvh w-full items-center justify-center px-4 py-12">
@@ -130,15 +131,19 @@ async function saveCode() {
         <div class="text-center">
           <div class="mb-8 flex flex-col items-center">
             <img
-              src="@/assets/GBVLogo.png"
-              alt="GTBV Logo"
+              :src="brand.logoUrl"
+              :alt="brand.appName + ' Logo'"
               class="mx-auto block h-auto max-h-[32vh] w-auto max-w-[min(512px,90vw)] object-contain drop-shadow-xl"
             />
             <img
-              src="@/assets/GatorBeachVolleyball.png"
-              alt="GT Beach Volleyball"
+              v-if="brand.logoWordmarkUrl"
+              :src="brand.logoWordmarkUrl"
+              :alt="brand.appName"
               class="mx-auto mt-4 block h-auto max-h-[32vh] w-auto max-w-[min(512px,90vw)] object-contain drop-shadow-xl"
             />
+            <p v-else class="mt-4 text-2xl font-extrabold tracking-tight text-white drop-shadow-md">
+              {{ brand.appName }}
+            </p>
           </div>
           <h1 class="text-3xl font-extrabold tracking-tight text-white drop-shadow-md sm:text-4xl">
             Enter the tournament code to continue.

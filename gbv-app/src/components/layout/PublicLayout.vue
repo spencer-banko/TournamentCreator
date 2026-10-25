@@ -2,6 +2,7 @@
 import { useRoute, useRouter } from 'vue-router';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useSessionStore, type TournamentSummary } from '../../stores/session';
+import { brand } from '../../lib/brand';
 
 withDefaults(defineProps<{ stickyHeader?: boolean }>(), {
   stickyHeader: true,
@@ -13,7 +14,7 @@ const session = useSessionStore();
 
 const accessCode = computed(() => (route.params.accessCode as string) ?? session.accessCode ?? '');
 const hasCode = computed(() => !!accessCode.value);
-const tournamentName = computed(() => session.tournament?.name || 'GT Beach Volleyball');
+const tournamentName = computed(() => session.tournament?.name || brand.appName);
 const tournamentPhase = computed(() => {
   const st = session.tournament?.status;
   if (!st) return null;
@@ -159,20 +160,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-full min-h-dvh w-full bg-[#0b1120] text-slate-100">
+  <div class="min-h-full min-h-dvh w-full gbv-page-bg text-slate-100">
     <!-- Public Header (GT navy + gold accents, aligned with admin dashboard) -->
     <header
       :class="stickyHeader ? 'sticky top-0 z-50' : ''"
       aria-label="Public tournament header"
     >
       <div
-        class="border-b border-slate-700/60 bg-slate-800/90 text-slate-100 shadow-sm shadow-black/20 backdrop-blur-md"
+        class="border-b border-slate-700/60 gbv-header-bg text-slate-100 shadow-sm shadow-black/20 backdrop-blur-md"
       >
         <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div class="flex min-w-0 items-center gap-3">
             <img
-              src="@/assets/GBVLogo.png"
-              alt="GTBV"
+              :src="brand.logoUrl"
+              :alt="brand.appName"
               class="h-8 w-auto drop-shadow-md"
             />
             <div class="min-w-0">
