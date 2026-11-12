@@ -1050,7 +1050,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-slate-100">
+  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
     <div class="mx-auto max-w-7xl">
     <UiSectionHeading
       variant="dashboard"
@@ -1063,16 +1063,16 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
           icon="pi pi-arrow-left"
           severity="secondary"
           outlined
-          class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
+          class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
           @click="router.push({ name: 'admin-dashboard' })"
         />
     </UiSectionHeading>
 
     <!-- Tournament loader -->
-    <div class="mt-2 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+    <div class="mt-2 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
         <div class="sm:col-span-2">
-          <label class="mb-2 block text-sm font-medium text-slate-300">Tournament Access Code</label>
+          <label class="mb-2 block text-sm font-medium text-tone-300">Tournament Access Code</label>
           <InputText
             v-model="accessCode"
             placeholder="e.g. GOJACKETS2025"
@@ -1090,19 +1090,19 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
           />
         </div>
       </div>
-      <div v-else class="text-sm text-slate-300">
+      <div v-else class="text-sm text-tone-300">
         Loaded:
-        <span class="font-semibold text-white">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-slate-400">({{ session.accessCode }})</span>
+        <span class="font-semibold text-ink">{{ session.tournament.name }}</span>
+        <span class="ml-2 text-tone-400">({{ session.accessCode }})</span>
       </div>
     </div>
 
     <!-- Autogenerate Pools -->
-    <div v-if="session.tournament" class="mt-4 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+    <div v-if="session.tournament" class="mt-4 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
       <div class="flex items-center justify-between">
         <div class="text-sm">
-          <div class="font-semibold text-white">Autogenerate Pools</div>
-          <div class="mt-1 text-slate-300">
+          <div class="font-semibold text-ink">Autogenerate Pools</div>
+          <div class="mt-1 text-tone-300">
             Creates pools of size 4 or 5 (prefers 5) from global seeds, assigns courts, and seeds within pools using snake distribution.
           </div>
         </div>
@@ -1118,14 +1118,14 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
     </div>
 
     <!-- Import Pools (Google Sheets CSV) -->
-    <div v-if="session.tournament" class="mt-4 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+    <div v-if="session.tournament" class="mt-4 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="text-sm">
-          <div class="font-semibold text-white">Import Pools (Google Sheets CSV)</div>
-          <div class="mt-1 text-slate-300">
+          <div class="font-semibold text-ink">Import Pools (Google Sheets CSV)</div>
+          <div class="mt-1 text-tone-300">
             Download the template CSV, import it into Google Sheets, then enter team names under <span class="font-mono">pool1</span>, <span class="font-mono">pool2</span>, <span class="font-mono">pool3</span>, <span class="font-mono">pool4</span>. Order in each column determines the seed within that pool. Uploading this CSV will create the teams automatically.
           </div>
-          <div class="mt-2 text-xs text-slate-400">
+          <div class="mt-2 text-xs text-tone-400">
             Google Sheets: File → Import (CSV) • then File → Download → Comma-separated values (.csv)
           </div>
         </div>
@@ -1145,7 +1145,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
 
       <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
         <div>
-          <label class="mb-2 block text-sm font-medium text-slate-300">Upload Pools CSV</label>
+          <label class="mb-2 block text-sm font-medium text-tone-300">Upload Pools CSV</label>
           <input
             ref="poolCsvInput"
             type="file"
@@ -1153,7 +1153,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
             class="w-full rounded-xl border border-slate-500/50 bg-white px-4 py-3 text-slate-900"
             @change="handlePoolsCsvChange"
           />
-          <div v-if="poolImportSummary.rows > 0" class="mt-2 text-xs text-slate-400">
+          <div v-if="poolImportSummary.rows > 0" class="mt-2 text-xs text-tone-400">
             Parsed: {{ poolImportSummary.rows }} row(s), {{ poolImportSummary.pools }} pool(s)
           </div>
         </div>
@@ -1179,9 +1179,9 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
         </ul>
       </div>
 
-      <div v-if="poolImportWarnings.length > 0" class="mt-3 rounded-xl border border-slate-600/40 bg-slate-900/35 p-3 text-sm text-slate-200">
+      <div v-if="poolImportWarnings.length > 0" class="mt-3 rounded-xl border border-tone-600/40 bg-tone-900/35 p-3 text-sm text-tone-200">
         <div class="mb-1 font-semibold">Warnings</div>
-        <ul class="list-disc list-inside text-slate-300">
+        <ul class="list-disc list-inside text-tone-300">
           <li v-for="(w, idx) in poolImportWarnings" :key="idx">{{ w }}</li>
         </ul>
       </div>
@@ -1210,7 +1210,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
           {{ ms.pool.name }} has {{ ms.missing }} team(s) without a seed.
         </li>
       </ul>
-      <div class="mt-2 text-xs text-slate-400">Schedule generation will be blocked until every team in a pool has a seed.</div>
+      <div class="mt-2 text-xs text-tone-400">Schedule generation will be blocked until every team in a pool has a seed.</div>
     </div>
 
     <div v-if="session.tournament" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -1218,26 +1218,26 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
       <div class="lg:col-span-1">
         <UiAccordion title="Pools" :defaultOpen="true">
           <div class="flex items-center justify-between">
-            <div class="text-xs text-slate-400">Total: {{ pools.length }}</div>
+            <div class="text-xs text-tone-400">Total: {{ pools.length }}</div>
           </div>
 
           <!-- Simple list of pools -->
-          <div class="mt-3 overflow-hidden rounded-xl border border-slate-600/45 bg-slate-800/35">
+          <div class="mt-3 overflow-hidden rounded-xl border border-tone-600/45 bg-tone-800/35">
             <button
               v-for="p in pools"
               :key="p.id"
-              class="w-full border-b border-slate-600/35 px-4 py-3 text-left last:border-b-0 hover:bg-slate-900/40"
-              :class="selectedPoolId === p.id ? 'bg-slate-700/45' : ''"
+              class="w-full border-b border-tone-600/35 px-4 py-3 text-left last:border-b-0 hover:bg-tone-900/40"
+              :class="selectedPoolId === p.id ? 'bg-tone-700/45' : ''"
               @click="selectPool(p)"
             >
-              <div class="font-semibold text-white">{{ p.name }}</div>
-              <div class="text-xs text-slate-400">Court: {{ p.court_assignment || 'TBD' }}</div>
+              <div class="font-semibold text-ink">{{ p.name }}</div>
+              <div class="text-xs text-tone-400">Court: {{ p.court_assignment || 'TBD' }}</div>
             </button>
           </div>
 
           <!-- New pool -->
-          <div class="mt-4 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-            <div class="text-sm font-semibold text-white">New Pool</div>
+          <div class="mt-4 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
+            <div class="text-sm font-semibold text-ink">New Pool</div>
             <div class="mt-2 grid grid-cols-1 gap-3">
               <InputText v-model="newPoolName" placeholder="e.g. Pool A" class="!rounded-xl !px-4 !py-3 !bg-white !text-slate-900" />
               <InputText v-model="newPoolCourt" placeholder="Court (optional)" class="!rounded-xl !px-4 !py-3 !bg-white !text-slate-900" />
@@ -1261,8 +1261,8 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
           </div>
 
           <!-- Edit pool -->
-          <div v-if="selectedPool" class="mt-4 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-            <div class="text-sm font-semibold text-white">Edit Pool</div>
+          <div v-if="selectedPool" class="mt-4 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
+            <div class="text-sm font-semibold text-ink">Edit Pool</div>
             <div class="mt-2 grid grid-cols-1 gap-3">
               <InputText v-model="editPoolName" placeholder="Pool name" class="!rounded-xl !px-4 !py-3 !bg-white !text-slate-900" />
               <InputText v-model="editCourt" placeholder="Court (optional)" class="!rounded-xl !px-4 !py-3 !bg-white !text-slate-900" />
@@ -1301,19 +1301,19 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
         <div class="grid grid-cols-1 gap-6">
           <!-- Unassigned -->
           <UiAccordion title="Unassigned Teams" :defaultOpen="true" subtitle="Move a team into a pool to assign">
-            <div class="overflow-hidden rounded-xl border border-slate-600/45 bg-slate-800/35">
+            <div class="overflow-hidden rounded-xl border border-tone-600/45 bg-tone-800/35">
               <div
                 v-for="t in unassignedTeams"
                 :key="t.id"
-                class="border-b border-slate-600/35 px-4 py-3 last:border-b-0"
+                class="border-b border-tone-600/35 px-4 py-3 last:border-b-0"
               >
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <div class="font-medium text-white">{{ t.full_team_name }}</div>
-                    <div class="text-xs text-slate-400">No pool</div>
+                    <div class="font-medium text-ink">{{ t.full_team_name }}</div>
+                    <div class="text-xs text-tone-400">No pool</div>
                   </div>
                   <div class="flex items-center gap-3">
-                    <label class="text-sm text-slate-300">Move</label>
+                    <label class="text-sm text-tone-300">Move</label>
                     <Dropdown
                       :options="moveOptions"
                       optionLabel="label"
@@ -1326,7 +1326,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
                   </div>
                 </div>
               </div>
-              <div v-if="unassignedTeams.length === 0" class="px-4 py-3 text-sm text-slate-400">No teams.</div>
+              <div v-if="unassignedTeams.length === 0" class="px-4 py-3 text-sm text-tone-400">No teams.</div>
             </div>
           </UiAccordion>
 
@@ -1352,7 +1352,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
                 />
               </template>
               <div class="flex items-center justify-between">
-                <div class="text-xs text-slate-400">Drop-down to move teams between pools</div>
+                <div class="text-xs text-tone-400">Drop-down to move teams between pools</div>
                 <div
                   v-if="poolHasSeedConflicts(p.id)"
                   class="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-100"
@@ -1362,19 +1362,19 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
                 </div>
               </div>
 
-              <div class="mt-3 overflow-hidden rounded-xl border border-slate-600/45 bg-slate-800/35">
+              <div class="mt-3 overflow-hidden rounded-xl border border-tone-600/45 bg-tone-800/35">
                 <div
                   v-for="t in teamsForPool(p.id)"
                   :key="t.id"
-                  class="border-b border-slate-600/35 px-4 py-3 last:border-b-0"
+                  class="border-b border-tone-600/35 px-4 py-3 last:border-b-0"
                 >
                   <div class="grid grid-cols-1 items-center gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                      <div class="font-medium text-white">{{ t.full_team_name }}</div>
-                      <div class="text-xs text-slate-400">ID: {{ t.id.slice(0, 8) }}…</div>
+                      <div class="font-medium text-ink">{{ t.full_team_name }}</div>
+                      <div class="text-xs text-tone-400">ID: {{ t.id.slice(0, 8) }}…</div>
                     </div>
                     <div class="flex items-center gap-2">
-                      <label class="text-sm text-slate-300">Seed</label>
+                      <label class="text-sm text-tone-300">Seed</label>
                       <InputText
                         :value="t.seed_in_pool ?? ''"
                         style="width: 4.5rem"
@@ -1384,7 +1384,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
                       />
                     </div>
                     <div class="flex items-center gap-3 lg:justify-end">
-                      <label class="text-sm text-slate-300">Move</label>
+                      <label class="text-sm text-tone-300">Move</label>
                       <Dropdown
                         :options="moveOptions"
                         optionLabel="label"
@@ -1397,21 +1397,21 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
                     </div>
                   </div>
                 </div>
-                <div v-if="teamsForPool(p.id).length === 0" class="px-4 py-3 text-sm text-slate-400">
+                <div v-if="teamsForPool(p.id).length === 0" class="px-4 py-3 text-sm text-tone-400">
                   No teams yet.
                 </div>
               </div>
             </UiAccordion>
           </div>
 
-          <div class="rounded-xl border border-dashed border-slate-600/50 bg-slate-800/30 p-4 text-center text-sm text-slate-400">
+          <div class="rounded-xl border border-dashed border-tone-600/50 bg-tone-800/30 p-4 text-center text-sm text-tone-400">
             Tip: Use the Move menu to change a team's pool. Seeds must be unique within each pool.
           </div>
         </div>
       </div>
     </div>
 
-    <div class="mt-10 border-t border-slate-800 pt-6 text-sm text-slate-400">
+    <div class="mt-10 border-t border-tone-800 pt-6 text-sm text-tone-400">
       Seeds must be unique within each pool. You can leave seeds blank temporarily, but schedule generation requires complete seeding.
     </div>
     </div>

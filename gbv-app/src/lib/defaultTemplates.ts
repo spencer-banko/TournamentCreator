@@ -3,6 +3,7 @@ import type { ScheduleTemplateRound } from '../types/db';
 /**
  * Returns the default schedule template for a given pool size.
  * Supported pool sizes: 3–6. For any other size, returns [].
+ * A 3-team pool playing best-of-3 match play gets a single round robin; otherwise a double round robin.
  *
  * Each round defines:
  * - play: array of [seedA, seedB] pairs (we use one court per round by default here)
@@ -10,7 +11,16 @@ import type { ScheduleTemplateRound } from '../types/db';
  *
  * Note: Admins can customize templates per tournament in the UI; these are just defaults.
  */
-export function defaultTemplateForPoolSize(size: number): ScheduleTemplateRound[] {
+export function defaultTemplateForPoolSize(size: number, bestOf = 1): ScheduleTemplateRound[] {
+  if (size === 3 && bestOf > 1) {
+    // Match play: each pair meets once, best of 3 (3 matches)
+    return [
+      { round: 1, play: [[1, 3]], ref: [2] },
+      { round: 2, play: [[2, 3]], ref: [1] },
+      { round: 3, play: [[1, 2]], ref: [3] },
+    ];
+  }
+
   if (size === 6) {
     // 12 total matches (single court ordering) — each team plays 4 matches
     // Round: [Team1 vs Team2] Ref

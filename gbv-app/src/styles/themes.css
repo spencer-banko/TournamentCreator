@@ -23,6 +23,10 @@
   --brand-bg:          #ede0d1;
   --brand-ink:         #0f172a;
 
+  /* Ink as R G B for rgba() in plain CSS (white text on dark UI) */
+  --ink-rgb: 255, 255, 255;
+  --shadow-rgb: 0, 0, 0;
+
   /* Page & header shell colors */
   --brand-page-bg:    #0b1120;
   --brand-header-bg:  rgba(30, 41, 59, 0.90);   /* slate-800/90 */
@@ -50,9 +54,42 @@
   --brand-bg:          #f0f4f8;
   --brand-ink:         #0f172a;
 
-  /* Page & header shell colors — ECVA navy-to-red diagonal gradient */
-  --brand-page-bg:    linear-gradient(135deg, #001a3a 0%, #001030 55%, #3d0000 100%);
-  --brand-header-bg:  rgba(0, 20, 60, 0.92);
+  /* Light UI: white page, navy ink, ECVA red accent */
+  --brand-page-bg:    #ffffff;
+  --brand-header-bg:  rgba(255, 255, 255, 0.92);
+  --ink-rgb: 15, 23, 42;
+  --shadow-rgb: 15, 23, 42;
+
+  /* Inverted neutral scale: tone-50 = darkest ink ... tone-950 = white */
+  --color-tone-50:  #0b1730;
+  --color-tone-100: #13213d;
+  --color-tone-200: #263449;
+  --color-tone-300: #3b4a60;
+  --color-tone-400: #536179;
+  --color-tone-500: #6b778c;
+  --color-tone-600: #c5cfdc;
+  --color-tone-700: #dbe2ea;
+  --color-tone-800: #eef2f6;
+  --color-tone-900: #f6f8fa;
+  --color-tone-950: #ffffff;
+  --color-ink:      #0b1730;
+  --color-paper:    #ffffff;
+
+  /* Accent ("amber" is the UI-wide accent token) -> ECVA red; light shades darkened for text on white */
+  --color-amber-50:  #fdecec;
+  --color-amber-100: #9b0a0a;
+  --color-amber-200: #a50d0d;
+  --color-amber-300: #b40f0f;
+  --color-amber-400: #c81414;
+  --color-amber-500: #cc0000;
+  --color-amber-600: #a30000;
+
+  /* Status text tuned for white backgrounds */
+  --color-emerald-300: #047857;
+  --color-emerald-400: #047857;
+  --color-green-300:   #15803d;
+  --color-red-200:     #b91c1c;
+  --color-red-300:     #b91c1c;
 
   /* Tailwind gbv token overrides */
   --color-gbv-blue:       #003366;

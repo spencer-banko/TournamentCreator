@@ -215,7 +215,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-slate-100">
+  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
     <div class="mx-auto max-w-6xl">
     <UiSectionHeading
       variant="dashboard"
@@ -228,16 +228,16 @@ onMounted(async () => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
+        class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
         @click="router.push({ name: 'admin-dashboard' })"
       />
     </UiSectionHeading>
 
     <!-- Tournament context -->
-    <div class="mt-2 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+    <div class="mt-2 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
         <div class="sm:col-span-2">
-          <label class="mb-2 block text-sm font-medium text-slate-300">Tournament Access Code</label>
+          <label class="mb-2 block text-sm font-medium text-tone-300">Tournament Access Code</label>
           <InputText
             v-model="accessCode"
             placeholder="e.g. GOJACKETS2025"
@@ -256,16 +256,16 @@ onMounted(async () => {
         </div>
       </div>
       <div v-else class="flex items-center justify-between">
-        <div class="text-sm text-slate-300">
+        <div class="text-sm text-tone-300">
           Tournament:
-          <span class="font-semibold text-white">{{ session.tournament?.name }}</span>
-          <span class="ml-2 text-slate-400">({{ session.accessCode }})</span>
+          <span class="font-semibold text-ink">{{ session.tournament?.name }}</span>
+          <span class="ml-2 text-tone-400">({{ session.accessCode }})</span>
         </div>
         <Button
           label="Change"
           severity="secondary"
           text
-          class="!rounded-xl !text-slate-200 hover:!bg-slate-800/80 hover:!text-amber-100"
+          class="!rounded-xl !text-tone-200 hover:!bg-tone-800/80 hover:!text-amber-100"
           icon="pi pi-external-link"
           @click="changeTournamentCode"
         />
@@ -274,11 +274,11 @@ onMounted(async () => {
 
     <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
       <!-- Preferred workflow -->
-      <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-        <div class="text-sm font-semibold text-white">Preferred: Pools CSV Import</div>
-        <div class="mt-2 text-sm text-slate-300">
-          To auto-generate teams + pools (and pool seeds), go to <span class="font-semibold text-white">Pools &amp; Seeds</span> and use
-          <span class="font-mono text-slate-200">pool1,pool2,pool3,pool4</span> columns in the template.
+      <div class="rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
+        <div class="text-sm font-semibold text-ink">Preferred: Pools CSV Import</div>
+        <div class="mt-2 text-sm text-tone-300">
+          To auto-generate teams + pools (and pool seeds), go to <span class="font-semibold text-ink">Pools &amp; Seeds</span> and use
+          <span class="font-mono text-tone-200">pool1,pool2,pool3,pool4</span> columns in the template.
         </div>
         <div class="mt-3">
           <Button
@@ -297,7 +297,7 @@ onMounted(async () => {
           <div class="grid gap-4">
             <div class="grid grid-cols-1 gap-3 items-end sm:grid-cols-2">
               <div>
-                <label class="mb-2 block text-sm font-medium text-slate-300">Team Name</label>
+                <label class="mb-2 block text-sm font-medium text-tone-300">Team Name</label>
                 <InputText
                   v-model="manualTeamName"
                   placeholder="e.g. Alice + Bob"
@@ -318,18 +318,18 @@ onMounted(async () => {
 
             <div class="admin-teams-list">
             <!-- Mobile-first existing teams list (matches tournament list panel look) -->
-            <div class="lg:hidden rounded-xl border border-slate-600/40 bg-slate-800/35 overflow-hidden">
+            <div class="lg:hidden rounded-xl border border-tone-600/40 bg-tone-800/35 overflow-hidden">
               <div
                 v-for="(t, idx) in teams"
                 :key="t.id"
-                class="px-4 py-3 border-t border-slate-600/35 first:border-t-0 transition-colors hover:bg-slate-900/40"
+                class="px-4 py-3 border-t border-tone-600/35 first:border-t-0 transition-colors hover:bg-tone-900/40"
               >
                 <div class="flex items-start justify-between gap-2">
-                  <span class="text-base tabular-nums text-slate-400 shrink-0">{{ idx + 1 }}</span>
+                  <span class="text-base tabular-nums text-tone-400 shrink-0">{{ idx + 1 }}</span>
                   <div class="min-w-0 flex-1">
-                    <div class="text-lg font-semibold leading-snug text-white">{{ t.full_team_name }}</div>
-                    <div class="mt-0.5 text-sm text-slate-300">
-                      Global seed: <span class="font-semibold text-white">{{ t.seed_global ?? '—' }}</span>
+                    <div class="text-lg font-semibold leading-snug text-ink">{{ t.full_team_name }}</div>
+                    <div class="mt-0.5 text-sm text-tone-300">
+                      Global seed: <span class="font-semibold text-ink">{{ t.seed_global ?? '—' }}</span>
                     </div>
                   </div>
                   <div class="flex shrink-0 items-center gap-1">
@@ -354,7 +354,7 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
-              <div v-if="teams.length === 0" class="px-4 py-4 text-sm text-slate-400">No teams yet.</div>
+              <div v-if="teams.length === 0" class="px-4 py-4 text-sm text-tone-400">No teams yet.</div>
             </div>
 
             <!-- Desktop DataTable (aligned with dashboard tournament table) -->
@@ -363,30 +363,30 @@ onMounted(async () => {
                 :value="teams"
                 scrollable
                 scrollHeight="22rem"
-                class="admin-tournament-datatable rounded-xl border border-slate-600/40 bg-slate-800/35"
+                class="admin-tournament-datatable rounded-xl border border-tone-600/40 bg-tone-800/35"
                 tableClass="!text-base"
                 :pt="{
                   table: { class: 'bg-transparent' },
-                  thead: { class: 'bg-slate-800/95 text-slate-200' },
-                  tbody: { class: 'text-slate-200' },
+                  thead: { class: 'bg-tone-800/95 text-tone-200' },
+                  tbody: { class: 'text-tone-200' },
                 }"
               >
                 <Column
                   header="#"
-                  headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+                  headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
                   style="width: 2.75rem"
                 >
                   <template #body="{ index }">
-                    <span class="text-base tabular-nums text-slate-400">{{ (index as number) + 1 }}</span>
+                    <span class="text-base tabular-nums text-tone-400">{{ (index as number) + 1 }}</span>
                   </template>
                 </Column>
                 <Column
                   field="full_team_name"
                   header="Team name"
-                  headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+                  headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
                 >
                   <template #body="{ data }">
-                    <div class="text-lg font-semibold leading-snug text-white">
+                    <div class="text-lg font-semibold leading-snug text-ink">
                       {{ (data as TeamRow).full_team_name }}
                     </div>
                   </template>
@@ -394,11 +394,11 @@ onMounted(async () => {
                 <Column
                   field="seed_global"
                   header="Global seed"
-                  headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+                  headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
                   style="width: 9rem"
                 >
                   <template #body="{ data }">
-                    <span class="text-base font-semibold text-white">{{
+                    <span class="text-base font-semibold text-ink">{{
                       (data as TeamRow).seed_global ?? '—'
                     }}</span>
                   </template>
@@ -406,7 +406,7 @@ onMounted(async () => {
                 <Column
                   header="Actions"
                   style="width: 6.5rem"
-                  headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+                  headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
                 >
                   <template #body="{ data }">
                     <div class="flex items-center justify-center gap-1">
@@ -438,12 +438,12 @@ onMounted(async () => {
             <!-- Inline editor -->
             <div
               v-if="editDialogOpen"
-              class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20"
+              class="rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20"
             >
-              <div class="text-sm font-semibold text-white">Edit Team</div>
+              <div class="text-sm font-semibold text-ink">Edit Team</div>
               <div class="mt-3 grid grid-cols-1 gap-3 items-end sm:grid-cols-2">
                 <div class="sm:col-span-2">
-                  <label class="mb-2 block text-sm font-medium text-slate-300">Team Name</label>
+                  <label class="mb-2 block text-sm font-medium text-tone-300">Team Name</label>
                   <InputText v-model="editTeamName" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" />
                 </div>
               </div>
@@ -459,7 +459,7 @@ onMounted(async () => {
                   label="Cancel"
                   severity="secondary"
                   outlined
-                  class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
+                  class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
                   @click="editDialogOpen = false"
                 />
               </div>

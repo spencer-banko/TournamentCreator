@@ -1,6 +1,22 @@
 import supabase from './supabase';
 import type { ScheduleTemplateRound } from '../types/db';
 import { defaultTemplateForPoolSize } from './defaultTemplates';
+import type { GameRules, MatchFormat } from '../types/db';
+import { normalizeFormat, DEFAULT_MATCH_PLAY } from './scoring';
+
+/** Match format for a pool of the given size, from tournament game rules. */
+export function poolFormatForSize(rules: GameRules | null | undefined, size: number): MatchFormat {
+  const pool = rules?.pool ?? {};
+  const explicit = pool.formatBySize?.[String(size)];
+  if (explicit) return normalizeFormat(explicit, explicit.bestOf === 3 ? DEFAULT_MATCH_PLAY : undefined);
+  const target = Number(pool.setTargetByPoolSize?.[String(size)] ?? pool.setTarget ?? 21) || 21;
+  return normalizeFormat({ bestOf: pool.bestOf === 3 ? 3 : 1, setTargets: pool.bestOf === 3 ? [target, target, 15] : [target], cap: pool.cap ?? null, winBy2: pool.winBy2 });
+}
+
+async function loadGameRules(tournamentId: string): Promise<GameRules | null> {
+  const { data } = await supabase.from('tournaments').select('game_rules').eq('id', tournamentId).single();
+  return ((data as any)?.game_rules ?? null) as GameRules | null;
+}
 
 type TeamRec = {
   id: string;
@@ -124,6 +140,7 @@ export async function checkPrerequisites(tournamentId: string): Promise<{ ok: bo
   }
 
   // Ensure templates exist or auto-seed for supported sizes
+  const gameRules = await loadGameRules(tournamentId);
   for (const sz of sizesNeeded.filter((s) => allowedSizes.has(s))) {
     const { data: tmpl, error: tmplErr } = await supabase
       .from('schedule_templates')
@@ -134,7 +151,7 @@ export async function checkPrerequisites(tournamentId: string): Promise<{ ok: bo
 
     // Auto-seed if missing
     if (tmplErr || !tmpl) {
-      const defaults = defaultTemplateForPoolSize(sz);
+      const defaults = defaultTemplateForPoolSize(sz, poolFormatForSize(gameRules, sz).bestOf);
       if (defaults.length > 0) {
         const { error: upErr } = await supabase
           .from('schedule_templates')
@@ -151,34 +168,6 @@ export async function checkPrerequisites(tournamentId: string): Promise<{ ok: bo
         }
       } else {
         errors.push(`Missing schedule template for pool size ${sz}.`);
-      }
-    } else if (sz === 3) {
-      // Legacy migration: older default was a 3-match single RR for 3-team pools.
-      // New default is double RR (6 matches). Only auto-upgrade if the template matches the legacy default exactly.
-      const td = (tmpl as any).template_data as unknown;
-      const isLegacySingleRR =
-        Array.isArray(td) &&
-        td.length === 3 &&
-        td[0]?.round === 1 &&
-        Array.isArray(td[0]?.play) &&
-        JSON.stringify(td[0].play) === JSON.stringify([[1, 2]]) &&
-        JSON.stringify(td[0]?.ref) === JSON.stringify([3]) &&
-        td[1]?.round === 2 &&
-        JSON.stringify(td[1]?.play) === JSON.stringify([[2, 3]]) &&
-        JSON.stringify(td[1]?.ref) === JSON.stringify([1]) &&
-        td[2]?.round === 3 &&
-        JSON.stringify(td[2]?.play) === JSON.stringify([[1, 3]]) &&
-        JSON.stringify(td[2]?.ref) === JSON.stringify([2]);
-
-      if (isLegacySingleRR) {
-        const defaults = defaultTemplateForPoolSize(3);
-        const { error: upErr } = await supabase
-          .from('schedule_templates')
-          .update({ template_data: defaults })
-          .eq('id', (tmpl as any).id);
-        if (upErr) {
-          errors.push(`Failed to upgrade legacy 3-team schedule template: ${upErr.message}`);
-        }
       }
     }
   }
@@ -219,6 +208,7 @@ export async function generateSchedule(tournamentId: string): Promise<GenerateRe
 
   let totalInserted = 0;
   const errors: string[] = [];
+  const gameRules = await loadGameRules(tournamentId);
 
   for (const p of pools) {
     const group = (teamsByPool.get(p.id) ?? []).slice().sort((a, b) => (a.seed_in_pool ?? 0) - (b.seed_in_pool ?? 0));
@@ -242,6 +232,7 @@ export async function generateSchedule(tournamentId: string): Promise<GenerateRe
     }
 
     const template = (tmpl as TemplateRec).template_data ?? [];
+    const fmt = poolFormatForSize(gameRules, poolSize);
     const seedMap = bySeed(group);
 
     // Build match rows
@@ -272,6 +263,9 @@ export async function generateSchedule(tournamentId: string): Promise<GenerateRe
           team2_score: null,
           winner_id: null,
           match_type: 'pool',
+          best_of: fmt.bestOf,
+          set_targets: fmt.setTargets,
+          set_scores: null,
           bracket_round: null,
           is_live: false,
           live_score_team1: null,

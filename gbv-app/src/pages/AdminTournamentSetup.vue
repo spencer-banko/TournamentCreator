@@ -7,19 +7,19 @@ import { useSessionStore } from '../stores/session';
 import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
-import InputNumber from 'primevue/inputnumber';
-import ToggleButton from 'primevue/togglebutton';
 import supabase from '../lib/supabase';
 import { deleteTournamentConfirmOptions } from '../lib/deleteTournamentConfirm';
 import { defaultTemplateForPoolSize } from '../lib/defaultTemplates';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import AdminTournamentListPanel from '@/components/admin/AdminTournamentListPanel.vue';
+import BracketsEditor from '@/components/admin/BracketsEditor.vue';
+import FormatPicker from '@/components/admin/FormatPicker.vue';
 import {
   adminBtnPillPt,
   adminBtnBluePillClass,
   adminBtnDangerPillClass,
 } from '@/lib/adminButtonStyles';
-import type { Tournament, TournamentStatus, AdvancementRules, GameRules } from '../types/db';
+import type { Tournament, TournamentStatus, AdvancementRules, GameRules, MatchFormat } from '../types/db';
 
 type EditableTournament = {
   id: string | null;
@@ -42,6 +42,8 @@ const session = useSessionStore();
 const saving = ref(false);
 const selectedId = ref<string | null>(null);
 const tournamentListRef = ref<InstanceType<typeof AdminTournamentListPanel> | null>(null);
+const bracketsRef = ref<InstanceType<typeof BracketsEditor> | null>(null);
+const POOL_SIZES = [3, 4, 5, 6] as const;
 
 const statusOptions: { label: string; value: TournamentStatus }[] = [
   { label: 'Draft', value: 'draft' },
@@ -60,7 +62,7 @@ const DEFAULT_ADV_RULES: AdvancementRules = {
     { fromPoolSize: 6, advanceCount: 3 },
   ],
   bracketFormat: 'single_elimination',
-  tiebreakers: ['head_to_head', 'set_ratio', 'point_diff', 'random'],
+  tiebreakers: ['point_diff', 'head_to_head', 'set_ratio'],
 };
 
 const DEFAULT_GAME_RULES: GameRules = {
@@ -70,6 +72,12 @@ const DEFAULT_GAME_RULES: GameRules = {
     bestOf: 1,
     winBy2: true,
     setTargetByPoolSize: { '3': 21, '4': 21, '5': 21, '6': 21 },
+    formatBySize: {
+      '3': { bestOf: 1, setTargets: [21], cap: null, winBy2: true },
+      '4': { bestOf: 1, setTargets: [21], cap: null, winBy2: true },
+      '5': { bestOf: 1, setTargets: [21], cap: null, winBy2: true },
+      '6': { bestOf: 1, setTargets: [21], cap: null, winBy2: true },
+    },
   },
   bracket: { setTarget: 21, cap: 99, bestOf: 1, winBy2: true, thirdSetTarget: 15 },
 };
@@ -148,6 +156,15 @@ function normalizeGameRules(r: GameRules | null | undefined): GameRules {
       bestOf: r.pool?.bestOf ?? base.pool!.bestOf,
       winBy2: r.pool?.winBy2 ?? base.pool!.winBy2,
       setTargetByPoolSize: mergedOverrides,
+      formatBySize: Object.fromEntries(
+        POOL_SIZES.map((sz) => {
+          const k = String(sz);
+          const f = (r.pool as any)?.formatBySize?.[k] as MatchFormat | undefined;
+          const legacyTarget = mergedOverrides[k] ?? r.pool?.setTarget ?? 21;
+          return [k, f ? { bestOf: f.bestOf === 3 ? 3 : 1, setTargets: f.setTargets?.length ? f.setTargets : [legacyTarget], cap: f.cap ?? null, winBy2: f.winBy2 !== false }
+                       : { bestOf: 1, setTargets: [legacyTarget], cap: null, winBy2: true }];
+        })
+      ),
     },
     bracket: {
       setTarget: r.bracket?.setTarget ?? base.bracket!.setTarget,
@@ -181,6 +198,40 @@ function requestDeleteCurrentForm() {
   );
 }
 
+// Helpers — pool formats
+function poolFormat(sz: number): MatchFormat {
+  return (form.value.game_rules.pool?.formatBySize?.[String(sz)] as MatchFormat) ?? { bestOf: 1, setTargets: [21], cap: null, winBy2: true };
+}
+function setPoolFormat(sz: number, f: MatchFormat) {
+  const pool = (form.value.game_rules.pool ??= {});
+  pool.formatBySize = { ...(pool.formatBySize ?? {}), [String(sz)]: f };
+  // keep legacy single-target field in sync for older readers
+  pool.setTargetByPoolSize = { ...(pool.setTargetByPoolSize ?? {}), [String(sz)]: f.setTargets[0] ?? 21 };
+}
+function poolMatchesPerTeam(sz: number): string {
+  if (sz === 6) return 'each team plays 4 of 5';
+  if (sz === 3) return poolFormat(3).bestOf === 3 ? 'each pair meets once' : 'each pair meets twice';
+  return 'round robin';
+}
+
+/**
+ * If the 3-team format switched between 1 set and best of 3 and the stored schedule is still
+ * the untouched default for the old format, swap in the default for the new one.
+ */
+async function syncDefaultTemplates(tournamentId: string) {
+  for (const sz of POOL_SIZES) {
+    const bestOf = poolFormat(sz).bestOf;
+    const other = bestOf === 3 ? 1 : 3;
+    const oldDefault = JSON.stringify(defaultTemplateForPoolSize(sz, other));
+    const newDefault = defaultTemplateForPoolSize(sz, bestOf);
+    if (oldDefault === JSON.stringify(newDefault)) continue;
+    const { data } = await supabase.from('schedule_templates').select('id,template_data').eq('tournament_id', tournamentId).eq('pool_size', sz).maybeSingle();
+    if (data && JSON.stringify((data as any).template_data) === oldDefault) {
+      await supabase.from('schedule_templates').update({ template_data: newDefault }).eq('id', (data as any).id);
+    }
+  }
+}
+
 // Helpers — Advancement UI
 
 type Tiebreaker = 'head_to_head' | 'set_ratio' | 'point_diff' | 'random';
@@ -198,20 +249,6 @@ function ensurePoolsConfig(rules: AdvancementRules) {
   }
   // sort by size asc
   rules.pools!.sort((a, b) => a.fromPoolSize - b.fromPoolSize);
-}
-
-function getAdvanceCount(size: number): number {
-  ensurePoolsConfig(form.value.advancement_rules);
-  const found = form.value.advancement_rules.pools!.find((p) => p.fromPoolSize === size);
-  return found?.advanceCount ?? 0;
-}
-
-function setAdvanceCount(size: number, value: number) {
-  ensurePoolsConfig(form.value.advancement_rules);
-  const max = size;
-  const val = Math.max(0, Math.min(max, Number(value) || 0));
-  const found = form.value.advancement_rules.pools!.find((p) => p.fromPoolSize === size);
-  if (found) found.advanceCount = val;
 }
 
 const tiebreakerOptions: Tiebreaker[] = [
@@ -257,11 +294,12 @@ function validateForm() {
   ensurePoolsConfig(form.value.advancement_rules);
   const tb = form.value.advancement_rules.tiebreakers || [];
   if (tb.length === 0) throw new Error('At least one tiebreaker is required');
-  if (!form.value.advancement_rules.bracketFormat) throw new Error('Bracket format is required');
+  const bracketErrors = bracketsRef.value?.errors ?? [];
+  if (bracketErrors.length) throw new Error(bracketErrors[0]);
 
   // Game rules sanity
   const gr = form.value.game_rules;
-  const phases: Array<keyof GameRules> = ['pool', 'bracket'];
+  const phases: Array<keyof GameRules> = ['pool'];
   for (const ph of phases) {
     const r: any = (gr as any)[ph] || {};
     ['setTarget', 'cap', 'bestOf'].forEach((k) => {
@@ -313,6 +351,8 @@ async function saveTournament() {
     if (form.value.id) {
       const { error } = await supabase.from('tournaments').update(payload).eq('id', form.value.id);
       if (error) throw error;
+      await bracketsRef.value?.save(form.value.id);
+      await syncDefaultTemplates(form.value.id);
       toast.add({ severity: 'success', summary: 'Tournament updated', life: 1500 });
     } else {
       const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -342,6 +382,11 @@ async function saveTournament() {
       toast.add({ severity: 'success', summary: 'Tournament created', life: 1500 });
       if (data) {
         const newId = (data as Tournament).id;
+        try {
+          await bracketsRef.value?.save(newId);
+        } catch (bErr: any) {
+          toast.add({ severity: 'warn', summary: 'Brackets not saved', detail: bErr?.message ?? String(bErr), life: 5000 });
+        }
         selectedId.value = newId;
 
         // Auto-seed default schedule templates for supported pool sizes if missing
@@ -351,7 +396,7 @@ async function saveTournament() {
             .map((sz) => ({
               tournament_id: newId,
               pool_size: sz,
-              template_data: defaultTemplateForPoolSize(sz),
+              template_data: defaultTemplateForPoolSize(sz, poolFormat(sz).bestOf),
             }))
             .filter((p) => Array.isArray(p.template_data) && p.template_data.length > 0);
 
@@ -420,7 +465,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-slate-100">
+  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
     <div class="mx-auto max-w-6xl">
     <UiSectionHeading
       variant="dashboard"
@@ -433,7 +478,7 @@ onMounted(async () => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
+        class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
         @click="router.push({ name: 'admin-dashboard' })"
       />
     </UiSectionHeading>
@@ -442,7 +487,7 @@ onMounted(async () => {
       <!-- Left: Tournaments list (wider column for readability) -->
       <div class="sm:col-span-2">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="text-lg font-semibold text-white">Tournaments</h3>
+          <h3 class="text-lg font-semibold text-ink">Tournaments</h3>
           <Button
             label="New"
             icon="pi pi-plus"
@@ -465,22 +510,22 @@ onMounted(async () => {
       <!-- Right: Editor -->
       <div class="sm:col-span-3">
         <!-- Basics -->
-        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+        <div class="rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="mb-2 block text-sm font-medium text-slate-300">Name</label>
+              <label class="mb-2 block text-sm font-medium text-tone-300">Name</label>
               <InputText v-model="form.name" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="e.g. Fall Classic 2025" />
             </div>
             <div>
-              <label class="mb-2 block text-sm font-medium text-slate-300">Date (YYYY-MM-DD)</label>
+              <label class="mb-2 block text-sm font-medium text-tone-300">Date (YYYY-MM-DD)</label>
               <InputText v-model="form.date" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="2025-10-12" />
             </div>
             <div>
-              <label class="mb-2 block text-sm font-medium text-slate-300">Access Code</label>
+              <label class="mb-2 block text-sm font-medium text-tone-300">Access Code</label>
               <InputText v-model="form.access_code" class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900" placeholder="GOJACKETS2025" />
             </div>
             <div>
-              <label class="mb-2 block text-sm font-medium text-slate-300">Status</label>
+              <label class="mb-2 block text-sm font-medium text-tone-300">Status</label>
               <Dropdown
                 v-model="form.status"
                 :options="statusOptions"
@@ -493,210 +538,60 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Rules -->
-        <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <!-- Advancement Rules -->
-          <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-            <div class="text-sm font-semibold text-white">Advancement Rules</div>
-
-            <div class="mt-3 space-y-3">
-              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
-                <div class="text-sm font-medium text-slate-200">Advancers per Pool Size</div>
-                <div class="mt-2 grid grid-cols-1 gap-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-slate-300">3 teams</div>
-                    <Dropdown
-                      :options="[0,1,2,3]"
-                      :modelValue="getAdvanceCount(3)"
-                      @update:modelValue="(v:any) => setAdvanceCount(3, v)"
-                      class="!rounded-xl w-32"
-                      :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                    />
-                  </div>
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-slate-300">4 teams</div>
-                    <Dropdown
-                      :options="[0,1,2,3,4]"
-                      :modelValue="getAdvanceCount(4)"
-                      @update:modelValue="(v:any) => setAdvanceCount(4, v)"
-                      class="!rounded-xl w-32"
-                      :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                    />
-                  </div>
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-slate-300">5 teams</div>
-                    <Dropdown
-                      :options="[0,1,2,3,4,5]"
-                      :modelValue="getAdvanceCount(5)"
-                      @update:modelValue="(v:any) => setAdvanceCount(5, v)"
-                      class="!rounded-xl w-32"
-                      :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                    />
-                  </div>
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-sm text-slate-300">6 teams</div>
-                    <Dropdown
-                      :options="[0,1,2,3,4,5,6]"
-                      :modelValue="getAdvanceCount(6)"
-                      @update:modelValue="(v:any) => setAdvanceCount(6, v)"
-                      class="!rounded-xl w-32"
-                      :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                    />
-                  </div>
-                </div>
+        <!-- Pool formats -->
+        <section class="mt-6 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/10">
+          <h3 class="text-sm font-semibold text-ink">Pool play format</h3>
+          <p class="mt-0.5 text-xs text-tone-400">How each pool match is played, by pool size. Applied when the pool schedule is generated.</p>
+          <div class="mt-3 grid gap-2">
+            <div
+              v-for="sz in POOL_SIZES"
+              :key="sz"
+              class="grid grid-cols-1 items-center gap-2 rounded-lg border border-tone-600/40 bg-tone-900/30 px-3 py-2 sm:grid-cols-[8.5rem_1fr]"
+            >
+              <div>
+                <div class="text-sm font-semibold text-tone-100">{{ sz }}-team pools</div>
+                <div class="text-[11px] text-tone-400">{{ poolMatchesPerTeam(sz) }}</div>
               </div>
-
-              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
-                <div class="text-sm font-medium text-slate-200">Bracket Format</div>
-                <Dropdown
-                  v-model="form.advancement_rules.bracketFormat"
-                  :options="[
-                    { label: 'Single Elimination', value: 'single_elimination' },
-                    { label: 'Best-of-3 Single Elim (Finals)', value: 'best_of_3_single_elim' }
-                  ]"
-                  optionLabel="label"
-                  optionValue="value"
-                  class="w-full !rounded-xl mt-2"
-                  :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                />
-              </div>
-
-              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
-                <div class="text-sm font-medium text-slate-200">Tiebreakers (reorder with arrows)</div>
-                <ul class="mt-2 space-y-2">
-                  <li
-                    v-for="(tb, idx) in (form.advancement_rules.tiebreakers || [])"
-                    :key="tb"
-                    class="flex items-center justify-between rounded-md border border-slate-600/40 bg-slate-900/30 p-2"
-                  >
-                    <div class="text-sm capitalize text-slate-200">
-                      {{ formatTb(tb as any) }}
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <Button icon="pi pi-arrow-up" text rounded @click="moveTiebreaker(idx, -1)" />
-                      <Button icon="pi pi-arrow-down" text rounded @click="moveTiebreaker(idx, 1)" />
-                    </div>
-                  </li>
-                </ul>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    v-for="opt in tiebreakerOptions"
-                    :key="opt"
-                    :label="(((form.advancement_rules.tiebreakers || []) as any[]).includes(opt) ? 'Remove ' : 'Add ') + formatTb(opt as any)"
-                    size="small"
-                    :severity="((form.advancement_rules.tiebreakers || []) as any[]).includes(opt) ? 'danger' : 'secondary'"
-                    outlined
-                    class="!rounded-xl"
-                    @click="toggleTiebreaker(opt)"
-                  />
-                </div>
-              </div>
+              <FormatPicker :modelValue="poolFormat(sz)" :label="`${sz}-team pool`" show-cap @update:modelValue="(f) => setPoolFormat(sz, f)" />
             </div>
           </div>
+        </section>
 
-          <!-- Game Rules -->
-          <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-            <div class="text-sm font-semibold text-white">Game Rules</div>
-
-            <div class="mt-3 grid grid-cols-1 gap-4">
-              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
-                <div class="text-sm font-semibold text-white">Pool Play</div>
-                <div class="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs text-slate-300 mb-1">Set Target</label>
-                    <InputNumber v-model="form.game_rules.pool!.setTarget" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-slate-300 mb-1">Cap</label>
-                    <InputNumber v-model="form.game_rules.pool!.cap" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                  </div>
-                  <div class="col-span-2 rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
-                    <div class="text-xs font-semibold text-slate-200">Set Target by Pool Size</div>
-                    <div class="mt-2 grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="block text-xs text-slate-300 mb-1">3 teams</label>
-                        <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['3']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                      </div>
-                      <div>
-                        <label class="block text-xs text-slate-300 mb-1">4 teams</label>
-                        <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['4']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                      </div>
-                      <div>
-                        <label class="block text-xs text-slate-300 mb-1">5 teams</label>
-                        <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['5']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                      </div>
-                      <div>
-                        <label class="block text-xs text-slate-300 mb-1">6 teams</label>
-                        <InputNumber v-model="form.game_rules.pool!.setTargetByPoolSize!['6']" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                      </div>
-                    </div>
-                    <div class="mt-2 text-xs text-slate-400">
-                      Overrides the Pool Play Set Target for matches in pools of that size.
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs text-slate-300 mb-1">Best Of</label>
-                    <Dropdown
-                      v-model="form.game_rules.pool!.bestOf"
-                      :options="[1,3]"
-                      class="w-full !rounded-xl"
-                      :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                    />
-                  </div>
-                  <div class="flex items-end">
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-slate-300">Win by 2</span>
-                      <ToggleButton v-model="form.game_rules.pool!.winBy2" onLabel="Yes" offLabel="No" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="rounded-lg border border-slate-600/40 bg-slate-900/30 p-3">
-                <div class="text-sm font-semibold text-white">Bracket</div>
-                <div class="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs text-slate-300 mb-1">Set Target</label>
-                    <InputNumber v-model="form.game_rules.bracket!.setTarget" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-slate-300 mb-1">Cap</label>
-                    <InputNumber v-model="form.game_rules.bracket!.cap" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-slate-300 mb-1">Best Of</label>
-                    <Dropdown
-                      v-model="form.game_rules.bracket!.bestOf"
-                      :options="[1,3]"
-                      class="w-full !rounded-xl"
-                      :pt="{ input: { class: '!py-2 !px-3 !text-sm !rounded-xl' } }"
-                    />
-                  </div>
-                  <div class="flex items-end">
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-slate-300">Win by 2</span>
-                      <ToggleButton v-model="form.game_rules.bracket!.winBy2" onLabel="Yes" offLabel="No" />
-                    </div>
-                  </div>
-                  <div v-if="form.game_rules.bracket!.bestOf === 3">
-                    <label class="block text-xs text-slate-300 mb-1">Third Set Target</label>
-                    <InputNumber v-model="form.game_rules.bracket!.thirdSetTarget" :min="1" class="w-full" :pt="{ input: { class: '!w-full !py-2 !px-3 !rounded-xl' } }" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- Brackets -->
+        <div class="mt-6">
+          <BracketsEditor ref="bracketsRef" :tournament-id="form.id" />
         </div>
 
-        <!-- Bracket flags -->
-        <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-            <div class="text-sm text-slate-200">Bracket Started</div>
-            <div class="mt-1 font-semibold text-white">{{ form.bracket_started ? 'Yes' : 'No' }}</div>
-            <div class="mt-2 text-xs text-slate-300">Generated at: {{ form.bracket_generated_at || '—' }}</div>
-            <div class="mt-2 text-xs text-slate-300">Note: This is managed by the bracket engine.</div>
+        <!-- Tiebreakers -->
+        <section class="mt-6 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/10">
+          <h3 class="text-sm font-semibold text-ink">Pool standings tiebreakers</h3>
+          <p class="mt-0.5 text-xs text-tone-400">Teams are ranked in their pool by wins first, then these in order.</p>
+          <ul class="mt-3 space-y-2">
+            <li
+              v-for="(tb, idx) in (form.advancement_rules.tiebreakers || [])"
+              :key="tb"
+              class="flex items-center justify-between rounded-md border border-tone-600/40 bg-tone-900/30 px-3 py-1.5"
+            >
+              <div class="text-sm capitalize text-tone-200"><span class="mr-2 text-tone-500">{{ idx + 1 }}.</span>{{ formatTb(tb as any) }}</div>
+              <div class="flex items-center gap-1">
+                <Button icon="pi pi-arrow-up" text rounded size="small" aria-label="Move up" :disabled="idx === 0" @click="moveTiebreaker(idx, -1)" />
+                <Button icon="pi pi-arrow-down" text rounded size="small" aria-label="Move down" :disabled="idx === (form.advancement_rules.tiebreakers || []).length - 1" @click="moveTiebreaker(idx, 1)" />
+                <Button icon="pi pi-times" text rounded size="small" severity="danger" :aria-label="`Remove ${formatTb(tb as any)}`" @click="toggleTiebreaker(tb as any)" />
+              </div>
+            </li>
+          </ul>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              v-for="opt in tiebreakerOptions.filter((o) => o !== 'random' && !((form.advancement_rules.tiebreakers || []) as string[]).includes(o))"
+              :key="opt"
+              type="button"
+              class="rounded-full border border-dashed border-tone-600/70 px-3 py-1 text-xs font-semibold capitalize text-tone-300 hover:border-amber-500/60 hover:text-ink"
+              @click="toggleTiebreaker(opt)"
+            >
+              + {{ formatTb(opt) }}
+            </button>
           </div>
-        </div>
+        </section>
 
         <!-- Actions -->
         <div class="mt-6 flex items-center gap-3">

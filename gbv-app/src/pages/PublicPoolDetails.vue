@@ -423,11 +423,11 @@ onBeforeUnmount(async () => {
               aria-label="Back to Pools"
             />
             <div class="min-w-0">
-              <h2 class="text-2xl font-semibold tracking-tight text-white">
+              <h2 class="text-2xl font-semibold tracking-tight text-ink">
                 {{ pool?.name || 'Pool' }}
               </h2>
-              <p class="mt-1 text-slate-400">
-                Court: <span class="font-medium text-slate-300">{{ pool?.court_assignment || 'TBD' }}</span>
+              <p class="mt-1 text-tone-400">
+                Court: <span class="font-medium text-tone-300">{{ pool?.court_assignment || 'TBD' }}</span>
               </p>
             </div>
           </div>
@@ -438,27 +438,27 @@ onBeforeUnmount(async () => {
             >
               Leaderboard
             </router-link>
-            <div v-if="loading" class="text-sm text-slate-400">Loading…</div>
+            <div v-if="loading" class="text-sm text-tone-400">Loading…</div>
           </div>
         </div>
 
         <!-- Standings -->
         <div class="mt-6">
-          <h3 class="text-lg font-semibold text-white">Standings</h3>
-          <div v-if="advanceCount != null" class="mt-1 text-sm text-slate-400">
-            Top <span class="font-semibold text-white">{{ advanceCount }}</span> of
-            <span class="font-semibold text-white">{{ teams.length }}</span> teams advance to bracket play.
+          <h3 class="text-lg font-semibold text-ink">Standings</h3>
+          <div v-if="advanceCount != null" class="mt-1 text-sm text-tone-400">
+            Top <span class="font-semibold text-ink">{{ advanceCount }}</span> of
+            <span class="font-semibold text-ink">{{ teams.length }}</span> teams advance to bracket play.
           </div>
-          <div v-if="standings.length === 0" class="mt-2 text-sm text-slate-400">No results yet.</div>
+          <div v-if="standings.length === 0" class="mt-2 text-sm text-tone-400">No results yet.</div>
           <ul v-else class="mt-3 grid gap-3">
             <li
               v-for="(s, i) in standings"
               :key="s.teamId"
-              class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 text-white shadow-lg shadow-black/25"
+              class="rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 text-ink shadow-lg shadow-black/25"
             >
               <div class="flex items-start gap-3">
                 <div
-                  class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-600/50 bg-slate-800/80 text-sm font-semibold tabular-nums text-slate-200"
+                  class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-tone-600/50 bg-tone-800/80 text-sm font-semibold tabular-nums text-tone-200"
                 >
                   {{ i + 1 }}
                 </div>
@@ -466,16 +466,16 @@ onBeforeUnmount(async () => {
                 <div class="min-w-0 flex-1">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
-                      <div class="font-semibold leading-tight text-white">
+                      <div class="font-semibold leading-tight text-ink">
                         {{ s.name }}
                       </div>
                     </div>
-                    <div class="shrink-0 text-sm tabular-nums text-slate-300">
+                    <div class="shrink-0 text-sm tabular-nums text-tone-300">
                       {{ s.wins }}-{{ s.losses }}
                     </div>
                   </div>
 
-                  <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tone-500">
                     <span>Seed: {{ s.seed ?? '—' }}</span>
                     <span>Set Ratio: {{ (s.setRatio * 100).toFixed(0) }}%</span>
                     <span>Pt Diff: {{ s.pointDiff > 0 ? '+' + s.pointDiff : s.pointDiff }}</span>
@@ -488,20 +488,20 @@ onBeforeUnmount(async () => {
 
         <!-- Schedule -->
         <div class="mt-8">
-          <h3 class="text-lg font-semibold text-white">Schedule</h3>
-          <div v-if="matches.length === 0" class="mt-2 text-sm text-slate-400">No matches scheduled.</div>
+          <h3 class="text-lg font-semibold text-ink">Schedule</h3>
+          <div v-if="matches.length === 0" class="mt-2 text-sm text-tone-400">No matches scheduled.</div>
           <ul v-else class="mt-3 grid gap-3">
             <li
               v-for="m in matches"
               :key="m.id"
               :class="[
-                'cursor-pointer rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 text-white shadow-lg shadow-black/25 transition-colors hover:border-amber-500/20 hover:bg-slate-800/65',
-                isLiveActive(m) ? 'ring-2 ring-red-500/70 ring-offset-2 ring-offset-[#0b1120]' : '',
+                'cursor-pointer rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 text-ink shadow-lg shadow-black/25 transition-colors hover:border-amber-500/20 hover:bg-tone-800/65',
+                isLiveActive(m) ? 'ring-2 ring-red-500/70 ring-offset-2 ring-offset-tone-950' : '',
               ]"
               @click="openMatch(m.id)"
             >
               <div class="flex items-center justify-between">
-                <div class="text-sm text-slate-400">
+                <div class="text-sm text-tone-400">
                   Round {{ m.round_number ?? '—' }}
                 </div>
                 <div class="ml-3 flex items-center gap-2">
@@ -514,7 +514,7 @@ onBeforeUnmount(async () => {
                   </span>
                   <span
                     v-if="m.team1_score != null && m.team2_score != null"
-                    class="inline-flex items-center whitespace-nowrap rounded-full border border-slate-600/50 bg-slate-800/80 px-2.5 py-0.5 text-xs font-medium text-slate-200"
+                    class="inline-flex items-center whitespace-nowrap rounded-full border border-tone-600/50 bg-tone-800/80 px-2.5 py-0.5 text-xs font-medium text-tone-200"
                   >
                     {{ completedLabel(m) }}
                   </span>
@@ -523,34 +523,34 @@ onBeforeUnmount(async () => {
               <div class="mt-1">
                 <div class="flex items-center justify-between gap-2">
                   <div
-                    class="min-w-0 truncate font-semibold leading-tight text-white"
+                    class="min-w-0 truncate font-semibold leading-tight text-ink"
                     :class="winnerSide(m) === 2 ? 'opacity-70 line-through decoration-2 decoration-slate-500' : ''"
                   >
                     {{ nameFor(m.team1_id) }}
                   </div>
                   <span
                     v-if="winnerSide(m) === 1"
-                    class="inline-flex shrink-0 items-center rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-900 ring-1 ring-amber-300/80"
+                    class="inline-flex shrink-0 items-center rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-tone-900 ring-1 ring-amber-300/80"
                   >
                     {{ winnerPillText(m, 1) }}
                   </span>
                 </div>
                 <div class="mt-1 flex items-center justify-between gap-2">
                   <div
-                    class="min-w-0 truncate font-semibold leading-tight text-white"
+                    class="min-w-0 truncate font-semibold leading-tight text-ink"
                     :class="winnerSide(m) === 1 ? 'opacity-70 line-through decoration-2 decoration-slate-500' : ''"
                   >
                     {{ nameFor(m.team2_id) }}
                   </div>
                   <span
                     v-if="winnerSide(m) === 2"
-                    class="inline-flex shrink-0 items-center rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-900 ring-1 ring-amber-300/80"
+                    class="inline-flex shrink-0 items-center rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-tone-900 ring-1 ring-amber-300/80"
                   >
                     {{ winnerPillText(m, 2) }}
                   </span>
                 </div>
               </div>
-              <div class="mt-1 text-xs text-slate-500">
+              <div class="mt-1 text-xs text-tone-500">
                 Ref: {{ nameFor(m.ref_team_id) }}
               </div>
             </li>

@@ -45,7 +45,7 @@ function toggle() {
         <div class="font-semibold tracking-wide truncate">
           {{ title }}
         </div>
-        <div v-if="subtitle" class="text-sm text-white/80 truncate">
+        <div v-if="subtitle" class="text-sm text-ink/80 truncate">
           {{ subtitle }}
         </div>
       </button>

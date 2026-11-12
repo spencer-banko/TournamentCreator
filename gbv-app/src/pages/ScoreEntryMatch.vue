@@ -229,26 +229,26 @@ onMounted(async () => {
             :on-click="backToMatch"
             aria-label="Back to Match"
           />
-          <h2 class="text-2xl font-semibold text-white truncate">Enter Score</h2>
+          <h2 class="text-2xl font-semibold text-ink truncate">Enter Score</h2>
         </div>
-        <div v-if="loading" class="text-sm text-white/80 shrink-0">Loading…</div>
+        <div v-if="loading" class="text-sm text-ink/80 shrink-0">Loading…</div>
       </div>
-      <p class="mt-1 text-white/80">
+      <p class="mt-1 text-ink/80">
         Submit final scores for this match.
       </p>
 
       <div v-if="match" class="mt-4 rounded-xl bg-white/10 ring-1 ring-white/20 p-4 text-white">
-        <div class="text-sm text-white/80">
+        <div class="text-sm text-ink/80">
           {{ match.match_type === 'bracket' ? 'Bracket' : 'Pool' }}{{ match.round_number ? ` R${match.round_number}` : '' }}
         </div>
         <div class="mt-2">
-          <div class="font-semibold text-white leading-tight">
+          <div class="font-semibold text-ink leading-tight">
             {{ nameFor(match.team1_id) }}
           </div>
-          <div class="text-sm font-medium text-white/70 leading-tight">
+          <div class="text-sm font-medium text-ink/70 leading-tight">
             vs
           </div>
-          <div class="font-semibold text-white leading-tight">
+          <div class="font-semibold text-ink leading-tight">
             {{ nameFor(match.team2_id) }}
           </div>
         </div>
@@ -256,7 +256,7 @@ onMounted(async () => {
 
       <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
-          <label class="block text-sm font-medium text-white/80 mb-2">{{ team1FinalScoreLabel }}</label>
+          <label class="block text-sm font-medium text-ink/80 mb-2">{{ team1FinalScoreLabel }}</label>
           <InputNumber
             v-model="team1Score"
             showButtons
@@ -272,7 +272,7 @@ onMounted(async () => {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-white/80 mb-2">{{ team2FinalScoreLabel }}</label>
+          <label class="block text-sm font-medium text-ink/80 mb-2">{{ team2FinalScoreLabel }}</label>
           <InputNumber
             v-model="team2Score"
             showButtons

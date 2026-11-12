@@ -23,8 +23,8 @@ const slots = defineSlots<{
     :class="
       props.divider
         ? props.variant === 'dashboard'
-          ? 'pb-3 mb-3 border-b border-slate-700/60'
-          : 'pb-3 mb-3 border-b border-white/15'
+          ? 'pb-3 mb-3 border-b border-tone-700/60'
+          : 'pb-3 mb-3 border-b border-ink/15'
         : 'pb-1'
     "
   >
@@ -32,14 +32,14 @@ const slots = defineSlots<{
       <div class="min-w-0">
         <h2
           class="text-xl sm:text-2xl font-extrabold tracking-tight truncate"
-          :class="props.variant === 'dashboard' ? 'text-white' : ''"
+          :class="props.variant === 'dashboard' ? 'text-ink' : ''"
         >
           {{ props.title }}
         </h2>
         <p
           v-if="props.subtitle"
           class="mt-0.5 text-sm truncate"
-          :class="props.variant === 'dashboard' ? 'text-slate-400' : 'text-white/80'"
+          :class="props.variant === 'dashboard' ? 'text-tone-400' : 'text-ink/80'"
         >
           {{ props.subtitle }}
         </p>

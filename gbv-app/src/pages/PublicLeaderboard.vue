@@ -262,17 +262,17 @@ onBeforeUnmount(async () => {
             aria-label="Return to Tournament"
           />
           <div class="min-w-0">
-            <h2 class="text-2xl font-semibold text-white">Global Leaderboard</h2>
-            <p class="mt-1 text-white/80">
+            <h2 class="text-2xl font-semibold text-ink">Global Leaderboard</h2>
+            <p class="mt-1 text-ink/80">
               Tournament-wide pool play standings.
             </p>
           </div>
         </div>
-        <div v-if="loading" class="text-sm text-white/80 shrink-0">Loading…</div>
+        <div v-if="loading" class="text-sm text-ink/80 shrink-0">Loading…</div>
       </div>
 
       <div class="mt-6">
-        <div v-if="standings.length === 0" class="text-sm text-white/80">No results yet.</div>
+        <div v-if="standings.length === 0" class="text-sm text-ink/80">No results yet.</div>
         <ul v-else class="mt-3 grid gap-3">
           <li
             v-for="(s, i) in standings"
@@ -289,16 +289,16 @@ onBeforeUnmount(async () => {
               <div class="min-w-0 flex-1">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0 flex-1">
-                    <div class="font-semibold text-white leading-tight">
+                    <div class="font-semibold text-ink leading-tight">
                       {{ s.name }}
                     </div>
                   </div>
-                  <div class="shrink-0 text-sm text-white/80 tabular-nums">
+                  <div class="shrink-0 text-sm text-ink/80 tabular-nums">
                     {{ s.wins }}-{{ s.losses }}
                   </div>
                 </div>
 
-                <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/70">
+                <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/70">
                   <span>Global Seed: {{ s.seed ?? '—' }}</span>
                   <span>Set Ratio: {{ (s.setRatio * 100).toFixed(0) }}%</span>
                   <span>Pt Diff: {{ s.pointDiff > 0 ? '+' + s.pointDiff : s.pointDiff }}</span>

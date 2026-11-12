@@ -160,14 +160,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-full min-h-dvh w-full gbv-page-bg text-slate-100">
+  <div class="min-h-full min-h-dvh w-full gbv-page-bg text-tone-100">
     <!-- Public Header (GT navy + gold accents, aligned with admin dashboard) -->
     <header
       :class="stickyHeader ? 'sticky top-0 z-50' : ''"
       aria-label="Public tournament header"
     >
       <div
-        class="border-b border-slate-700/60 gbv-header-bg text-slate-100 shadow-sm shadow-black/20 backdrop-blur-md"
+        class="border-b border-tone-700/60 gbv-header-bg text-tone-100 shadow-sm shadow-black/20 backdrop-blur-md"
       >
         <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div class="flex min-w-0 items-center gap-3">
@@ -177,10 +177,10 @@ onBeforeUnmount(() => {
               class="h-8 w-auto drop-shadow-md"
             />
             <div class="min-w-0">
-              <div class="truncate font-extrabold tracking-tight text-white">
+              <div class="truncate font-extrabold tracking-tight text-ink">
                 {{ tournamentName }}
               </div>
-              <div v-if="tournamentPhase" class="text-[11px] text-slate-400">
+              <div v-if="tournamentPhase" class="text-[11px] text-tone-400">
                 {{ tournamentPhase }}
               </div>
             </div>
@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
               <button
                 ref="menuButtonEl"
                 type="button"
-                class="gbv-pressable rounded-2xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-left text-slate-100 shadow-sm transition hover:border-amber-500/35 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
+                class="gbv-pressable rounded-2xl border border-tone-600/80 bg-tone-800/80 px-3 py-2 text-left text-tone-100 shadow-sm transition hover:border-amber-500/35 hover:bg-tone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
                 aria-label="Tournament access code menu"
                 aria-haspopup="menu"
                 :aria-expanded="menuOpen ? 'true' : 'false'"
@@ -199,11 +199,11 @@ onBeforeUnmount(() => {
               >
                 <div class="flex items-center gap-2">
                   <div class="min-w-0">
-                    <div class="text-[11px] leading-tight text-slate-400">Code</div>
-                    <div class="truncate font-mono font-semibold leading-tight text-white">{{ accessCode }}</div>
+                    <div class="text-[11px] leading-tight text-tone-400">Code</div>
+                    <div class="truncate font-mono font-semibold leading-tight text-ink">{{ accessCode }}</div>
                   </div>
                   <i
-                    class="pi text-slate-400"
+                    class="pi text-tone-400"
                     :class="menuOpen ? 'pi-chevron-up' : 'pi-chevron-down'"
                     aria-hidden="true"
                   />
@@ -216,30 +216,30 @@ onBeforeUnmount(() => {
                 class="absolute right-0 mt-2 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-white/95 text-slate-900 shadow-xl ring-1 ring-black/10 backdrop-blur-md"
                 role="menu"
               >
-                <div class="px-4 py-3 border-b border-slate-200/70">
-                  <div class="text-xs text-slate-500">Signed in</div>
+                <div class="px-4 py-3 border-b border-tone-200/70">
+                  <div class="text-xs text-tone-500">Signed in</div>
                   <div class="mt-0.5 font-semibold leading-tight truncate">
                     {{ tournamentName }}
                   </div>
-                  <div v-if="sameDayLabel" class="mt-0.5 text-xs text-slate-500">
+                  <div v-if="sameDayLabel" class="mt-0.5 text-xs text-tone-500">
                     Tournaments on {{ sameDayLabel }}
                   </div>
                 </div>
 
                 <div class="p-2 max-h-[75vh] flex flex-col gap-2">
                   <div class="flex-1 overflow-hidden">
-                    <div v-if="!sameDayDate" class="px-2 py-2 text-sm text-slate-600">
+                    <div v-if="!sameDayDate" class="px-2 py-2 text-sm text-tone-600">
                       Loading tournament…
                     </div>
-                    <div v-else-if="sameDayLoading" class="px-2 py-2 text-sm text-slate-600">
+                    <div v-else-if="sameDayLoading" class="px-2 py-2 text-sm text-tone-600">
                       Loading tournaments…
                     </div>
                     <div v-else class="h-full overflow-auto pr-1">
-                      <div class="px-2 pb-2 text-xs text-slate-500">
+                      <div class="px-2 pb-2 text-xs text-tone-500">
                         Tap a tournament to switch.
                       </div>
 
-                      <div v-if="(sameDayTournaments ?? []).length === 0" class="px-2 py-2 text-sm text-slate-600">
+                      <div v-if="(sameDayTournaments ?? []).length === 0" class="px-2 py-2 text-sm text-tone-600">
                         No other tournaments found for this day.
                       </div>
 
@@ -260,7 +260,7 @@ onBeforeUnmount(() => {
                                 {{ statusLabel(t.status) }}
                               </span>
                             </div>
-                            <div class="mt-0.5 text-[11px] text-slate-500">
+                            <div class="mt-0.5 text-[11px] text-tone-500">
                               Code: <span class="font-mono">{{ t.access_code }}</span>
                             </div>
                           </div>
@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
 
-                  <div class="border-t border-slate-200/70 pt-2">
+                  <div class="border-t border-tone-200/70 pt-2">
                     <button
                       type="button"
                       class="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gbv-dark-green/30 transition-colors"

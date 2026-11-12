@@ -6,25 +6,25 @@
 /* Ensure library container blends with our panel; keep text readable */
 .gbv-bracket-theme .vtb-wrapper {
   display: flex; /* increase selector specificity while preserving default layout */
-  color: #fff;
+  color: var(--color-ink);
 }
 
 /* Player stack container: no gray slab; individual players are tiles */
 .gbv-bracket-theme .vtb-item-players {
   background: transparent;
   margin: 0;
-  color: #fff;
+  color: var(--color-ink);
 }
 
 /* Team/match boxes (players) — rounded, semitransparent, white ring */
 .gbv-bracket-theme .vtb-item-players .vtb-player {
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.20);
+  background: rgba(var(--ink-rgb), 0.10);
+  border: 1px solid rgba(var(--ink-rgb), 0.20);
   padding: 8px 10px;
   line-height: 1.1;
   transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-  color: #fff;
+  color: var(--color-ink);
 }
 
 /* Small vertical separation between the two rows */
@@ -34,32 +34,32 @@
 
 /* Hover: gentle lift in brightness */
 .gbv-bracket-theme .vtb-item-players .vtb-player:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.30);
+  background: rgba(var(--ink-rgb), 0.15);
+  border-color: rgba(var(--ink-rgb), 0.30);
 }
 
 /* Winner/defeated state: subtle deltas; dark-theme friendly */
 .gbv-bracket-theme .vtb-item-players .winner {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(var(--ink-rgb), 0.18);
+  border-color: rgba(var(--ink-rgb), 0.35);
 }
 .gbv-bracket-theme .vtb-item-players .defeated {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.20);
+  background: rgba(var(--ink-rgb), 0.08);
+  border-color: rgba(var(--ink-rgb), 0.20);
   opacity: 0.95;
 }
 
 /* Highlight (hover-driven from lib): subtle inner ring */
 .gbv-bracket-theme .vtb-item-players .winner.highlight,
 .gbv-bracket-theme .vtb-item-players .defeated.highlight {
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.50);
+  box-shadow: inset 0 0 0 2px rgba(var(--ink-rgb), 0.50);
 }
 
 /* Connectors (horizontal and vertical pseudo-elements) — unify to semiwhite lines */
 .gbv-bracket-theme .vtb-item-parent::after,
 .gbv-bracket-theme .vtb-item-child::before,
 .gbv-bracket-theme .vtb-item-child::after {
-  background-color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(var(--ink-rgb), 0.45);
 }
 
 /* Optional: slightly tighter column spacing to match Admin custom view */

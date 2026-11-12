@@ -1,5 +1,6 @@
 import supabase from './supabase';
-import type { Tournament } from '../types/db';
+import type { Tournament, SetScore } from '../types/db';
+import { advanceWinnerToNextById } from './bracket';
 
 export type FillResult = { updated: number; errors: string[] };
 
@@ -140,7 +141,7 @@ export async function fillRandomPoolScores(tournamentId: string): Promise<FillRe
   // Fetch only null-scored pool matches with both teams assigned
   const { data, error } = await supabase
     .from('matches')
-    .select('id,pool_id,team1_id,team2_id')
+    .select('id,pool_id,team1_id,team2_id,best_of,set_targets')
     .eq('tournament_id', tournamentId)
     .eq('match_type', 'pool')
     .is('team1_score', null)
@@ -159,11 +160,7 @@ export async function fillRandomPoolScores(tournamentId: string): Promise<FillRe
     try {
       const sz = m.pool_id ? (poolSizeById.get(String(m.pool_id)) ?? null) : null;
       const rules = rulesForPoolSize(sz, baseRules);
-      const [w, l] = generatePlausibleSet(rules.setTarget, rules.cap, rules.winBy2);
-      const team1Wins = Math.random() < 0.5;
-      const team1_score = team1Wins ? w : l;
-      const team2_score = team1Wins ? l : w;
-      const winner_id = team1Wins ? (m.team1_id as string) : (m.team2_id as string);
+      const { team1_score, team2_score, winner_id, set_scores } = randomResult(m as any, rules);
 
       const { error: upErr } = await supabase
         .from('matches')
@@ -171,6 +168,7 @@ export async function fillRandomPoolScores(tournamentId: string): Promise<FillRe
           team1_score,
           team2_score,
           winner_id,
+          set_scores,
           is_live: false,
           live_score_team1: null,
           live_score_team2: null,
@@ -188,5 +186,81 @@ export async function fillRandomPoolScores(tournamentId: string): Promise<FillRe
     }
   }
 
+  return { updated, errors };
+}
+
+
+/** Random result honouring the match's own format (best_of / set_targets) when present. */
+function randomResult(
+  m: { team1_id: string | null; team2_id: string | null; best_of?: number | null; set_targets?: number[] | null },
+  rules: PoolRule
+): { team1_score: number; team2_score: number; winner_id: string; set_scores: SetScore[] | null } {
+  const bestOf = m.best_of === 3 ? 3 : 1;
+  const targets = Array.isArray(m.set_targets) && m.set_targets.length ? m.set_targets : bestOf === 3 ? [21, 21, 15] : [rules.setTarget];
+  const team1Wins = Math.random() < 0.5;
+  if (bestOf === 1) {
+    const target = targets[0] ?? rules.setTarget;
+    const [w, l] = generatePlausibleSet(target, Math.max(rules.cap, target + 10), rules.winBy2);
+    return {
+      team1_score: team1Wins ? w : l,
+      team2_score: team1Wins ? l : w,
+      winner_id: (team1Wins ? m.team1_id : m.team2_id) as string,
+      set_scores: null,
+    };
+  }
+  // Best of 3: winner takes 2 sets; ~40% go to a third set.
+  const goThree = Math.random() < 0.4;
+  const order: Array<1 | 2> = goThree ? (Math.random() < 0.5 ? [1, 2, 1] : [2, 1, 1]) : [1, 1];
+  const sets: SetScore[] = order.map((who, i) => {
+    const target = targets[Math.min(i, targets.length - 1)] ?? 21;
+    const [w, l] = generatePlausibleSet(target, target + 10, true);
+    const matchWinnerTakes = who === 1;
+    const t1Wins = team1Wins ? matchWinnerTakes : !matchWinnerTakes;
+    return t1Wins ? { t1: w, t2: l } : { t1: l, t2: w };
+  });
+  const won1 = sets.filter((x) => x.t1 > x.t2).length;
+  return {
+    team1_score: won1,
+    team2_score: sets.length - won1,
+    winner_id: (team1Wins ? m.team1_id : m.team2_id) as string,
+    set_scores: sets,
+  };
+}
+
+/**
+ * Test helper: play out one bracket with random results, round by round, advancing winners.
+ * Only fills matches that have both teams and no score yet.
+ */
+export async function fillRandomBracketScores(tournamentId: string, bracketId: string): Promise<FillResult> {
+  const errors: string[] = [];
+  let updated = 0;
+  const base: PoolRule = { setTarget: 21, cap: 99, winBy2: true };
+  for (let guard = 0; guard < 8; guard++) {
+    const { data, error } = await supabase
+      .from('matches')
+      .select('id,team1_id,team2_id,team1_score,best_of,set_targets,bracket_round')
+      .eq('tournament_id', tournamentId)
+      .eq('bracket_id', bracketId)
+      .is('team1_score', null)
+      .not('team1_id', 'is', null)
+      .not('team2_id', 'is', null)
+      .order('bracket_round', { ascending: true });
+    if (error) return { updated, errors: [...errors, error.message] };
+    const ready = (data as any[]) ?? [];
+    if (!ready.length) break;
+    for (const m of ready) {
+      const r = randomResult(m, base);
+      const { error: upErr } = await supabase
+        .from('matches')
+        .update({ ...r, is_live: false, live_score_team1: null, live_score_team2: null })
+        .eq('id', m.id);
+      if (upErr) {
+        errors.push(upErr.message);
+        continue;
+      }
+      updated++;
+      await advanceWinnerToNextById(tournamentId, m.id);
+    }
+  }
   return { updated, errors };
 }

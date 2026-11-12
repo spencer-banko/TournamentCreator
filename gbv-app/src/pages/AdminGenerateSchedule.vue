@@ -214,7 +214,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-slate-100">
+  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
     <div class="mx-auto max-w-6xl">
     <UiSectionHeading
       variant="dashboard"
@@ -227,16 +227,16 @@ onMounted(async () => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
-        class="!rounded-xl !border-slate-600/70 !text-slate-200 hover:!border-amber-500/35 hover:!bg-slate-800/80 hover:!text-amber-100"
+        class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
         @click="router.push({ name: 'admin-dashboard' })"
       />
     </UiSectionHeading>
 
     <!-- Tournament loader / context -->
-    <div class="mt-2 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+    <div class="mt-2 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
         <div class="sm:col-span-2">
-          <label class="mb-2 block text-sm font-medium text-slate-300">Tournament Access Code</label>
+          <label class="mb-2 block text-sm font-medium text-tone-300">Tournament Access Code</label>
           <InputText
             v-model="accessCode"
             placeholder="e.g. GOJACKETS2025"
@@ -254,18 +254,18 @@ onMounted(async () => {
           />
         </div>
       </div>
-      <div v-else class="text-sm text-slate-300">
-        Loaded: <span class="font-semibold text-white">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-slate-400">({{ session.accessCode }})</span>
+      <div v-else class="text-sm text-tone-300">
+        Loaded: <span class="font-semibold text-ink">{{ session.tournament.name }}</span>
+        <span class="ml-2 text-tone-400">({{ session.accessCode }})</span>
       </div>
     </div>
 
     <div v-if="session.tournament" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
       <!-- Status / actions -->
       <div class="lg:col-span-1">
-        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+        <div class="rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium text-slate-200">Existing pool matches</div>
+            <div class="text-sm font-medium text-tone-200">Existing pool matches</div>
             <Tag :value="hasMatches ? 'Yes' : 'No'" :severity="hasMatches ? 'warn' : 'success'" />
           </div>
           <div class="mt-4 grid gap-3">
@@ -316,9 +316,9 @@ onMounted(async () => {
 
       <!-- Prereq results and last result -->
       <div class="lg:col-span-2">
-        <div class="rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
+        <div class="rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-white">Prerequisite Results</h3>
+            <h3 class="text-lg font-semibold text-ink">Prerequisite Results</h3>
             <Tag :value="prereqErrors.length === 0 ? 'OK' : 'Issues'" :severity="prereqErrors.length === 0 ? 'success' : 'warn'" />
           </div>
           <div class="mt-3">
@@ -331,10 +331,10 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="lastResult" class="mt-6 rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 shadow-lg shadow-black/20">
-          <h3 class="text-lg font-semibold text-white">Last Generation Result</h3>
-          <p class="mt-1 text-sm text-slate-300">
-            Inserted: <span class="font-semibold text-white">{{ lastResult.inserted }}</span>
+        <div v-if="lastResult" class="mt-6 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
+          <h3 class="text-lg font-semibold text-ink">Last Generation Result</h3>
+          <p class="mt-1 text-sm text-tone-300">
+            Inserted: <span class="font-semibold text-ink">{{ lastResult.inserted }}</span>
           </p>
           <div v-if="(lastResult.errors || []).length > 0" class="mt-2">
             <div class="text-sm font-medium text-amber-200/95">Errors:</div>
@@ -347,7 +347,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="mt-10 border-t border-slate-800 pt-6 text-sm text-slate-400">
+    <div class="mt-10 border-t border-tone-800 pt-6 text-sm text-tone-400">
       Note: Generation uses admin-defined templates per pool size. Supported pool sizes are 3–6. Ensure templates exist for each size in use.
     </div>
     </div>

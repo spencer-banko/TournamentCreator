@@ -31,7 +31,7 @@ async function signIn(e: Event) {
 </script>
 
 <template>
-  <section class="relative min-h-dvh w-full overflow-hidden gbv-page-bg text-slate-100">
+  <section class="relative min-h-dvh w-full overflow-hidden gbv-page-bg text-tone-100">
     <div
       class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/12 blur-3xl"
       aria-hidden="true"
@@ -55,18 +55,18 @@ async function signIn(e: Event) {
               :alt="brand.appName"
               class="mx-auto mt-4 block h-auto max-h-[32vh] w-auto max-w-[min(512px,90vw)] object-contain drop-shadow-xl"
             />
-            <p v-else class="mt-4 text-2xl font-extrabold tracking-tight text-white drop-shadow-md">
+            <p v-else class="mt-4 text-2xl font-extrabold tracking-tight text-ink drop-shadow-md">
               {{ brand.appName }}
             </p>
           </div>
-          <h1 class="text-3xl font-extrabold tracking-tight text-white drop-shadow-md sm:text-4xl">Admin Console</h1>
-          <p class="mt-3 text-base text-slate-400 sm:text-lg">
+          <h1 class="text-3xl font-extrabold tracking-tight text-ink drop-shadow-md sm:text-4xl">Admin Console</h1>
+          <p class="mt-3 text-base text-tone-400 sm:text-lg">
             Manage players, pools, schedules, and brackets.
           </p>
         </div>
 
         <div
-          class="public-hero-card mt-8 rounded-2xl border border-slate-600/45 bg-gradient-to-br from-slate-800/90 via-slate-800/75 to-[#1a2740]/95 p-4 shadow-xl shadow-black/30 backdrop-blur-sm sm:p-6"
+          class="public-hero-card mt-8 rounded-2xl border border-tone-600/45 bg-gradient-to-br from-tone-800/90 via-tone-800/75 to-tone-900/95 p-4 shadow-xl shadow-black/30 backdrop-blur-sm sm:p-6"
         >
           <form class="space-y-5" @submit="signIn">
             <div
@@ -77,7 +77,7 @@ async function signIn(e: Event) {
             </div>
 
             <div class="space-y-2">
-              <label class="text-sm font-semibold text-slate-200">Email</label>
+              <label class="text-sm font-semibold text-tone-200">Email</label>
               <InputText
                 v-model="email"
                 type="email"
@@ -88,7 +88,7 @@ async function signIn(e: Event) {
             </div>
 
             <div class="space-y-2">
-              <label class="text-sm font-semibold text-slate-200">Password</label>
+              <label class="text-sm font-semibold text-tone-200">Password</label>
               <Password
                 v-model="password"
                 :feedback="false"
@@ -109,7 +109,7 @@ async function signIn(e: Event) {
             />
           </form>
 
-          <div class="mt-6 text-center text-sm text-slate-400">
+          <div class="mt-6 text-center text-sm text-tone-400">
             Public site:
             <router-link
               class="font-medium text-amber-400/90 underline decoration-amber-500/40 underline-offset-2 hover:text-amber-300"

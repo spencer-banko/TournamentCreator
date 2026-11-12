@@ -248,8 +248,8 @@ onBeforeUnmount(async () => {
       </div>
       <div v-show="!bracketChromeHidden" class="flex items-center justify-between gap-3">
         <div>
-          <h2 class="text-2xl font-semibold text-white">Bracket</h2>
-          <p class="mt-1 text-white/80">
+          <h2 class="text-2xl font-semibold text-ink">Bracket</h2>
+          <p class="mt-1 text-ink/80">
             Playoff bracket. Tap a match to view actions.
           </p>
         </div>
@@ -260,7 +260,7 @@ onBeforeUnmount(async () => {
           >
             Leaderboard
           </router-link>
-          <div v-if="loading" class="text-sm text-white/80">Loading…</div>
+          <div v-if="loading" class="text-sm text-ink/80">Loading…</div>
         </div>
       </div>
 
@@ -271,12 +271,12 @@ onBeforeUnmount(async () => {
         <div class="text-2xl sm:text-3xl font-extrabold leading-tight">
           {{ championName }} WON!! 🎉🎉
         </div>
-        <div class="mt-1 text-white/80 font-medium">
+        <div class="mt-1 text-ink/80 font-medium">
           Thank you for playing!
         </div>
       </div>
 
-      <div v-if="matches.length === 0" class="mt-6 rounded-xl border border-dashed border-white/30 p-6 text-center text-white/80">
+      <div v-if="matches.length === 0" class="mt-6 rounded-xl border border-dashed border-ink/30 p-6 text-center text-ink/80">
         No bracket matches yet.
       </div>
 

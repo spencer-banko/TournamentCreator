@@ -1,641 +1,294 @@
 import supabase from './supabase';
-import type { UUID, AdvancementRules, Tournament } from '../types/db';
+import type { AdvancementRules, Tournament, Bracket, BracketRoundFormat, MatchFormat } from '../types/db';
+import { rankAllPools, seedForPlaces, bracketSizeFor, seedSlotsForSize, DEFAULT_TIEBREAKERS, type Standing, type Tiebreaker } from './standings';
+import { normalizeFormat, DEFAULT_SINGLE_SET, DEFAULT_MATCH_PLAY } from './scoring';
 
 /**
- * Bracket Engine — Policy A (extended)
- * - Advancers per pool follow tournament advancement_rules (defaults: 4-team => 2 advance, 5-team => 3 advance).
- * - Bracket size = next power of two (2,4,8,16,32,64) covering total advancers (supports up to 64).
- * - Award byes to top seeds; pre-fill later-round slots when a bye occurs.
- * - On generation: set tournaments.status='bracket', bracket_generated_at=now; keep bracket_started=false.
- * - Rebuild allowed only when bracket_started=false; else block.
+ * Bracket engine — multiple single-elimination brackets per tournament (Gold / Silver / Bronze ...).
+ *
+ * - Each bracket is fed by pool finishing places (bracket.places, 1-based), e.g. {1,2} = top two of every pool.
+ *   A pool that has no team in a place simply contributes nothing (a 3-team pool has no 4th place).
+ * - Teams are seeded across pools by game (set) wins, then total point differential (see standings.ts).
+ * - Bracket size = next power of two; byes go to the top seeds and are auto-advanced one round.
+ * - Each round's match format (single set / best of 3) comes from bracket.round_formats (keyed from the final).
  */
 
-type TeamRec = {
-  id: UUID;
-  pool_id: UUID | null;
-  full_team_name: string;
-  seed_in_pool: number | null;
-};
-
-type MatchRec = {
-  id: UUID;
-  pool_id: UUID | null;
-  team1_id: UUID | null;
-  team2_id: UUID | null;
-  team1_score: number | null;
-  team2_score: number | null;
-  winner_id: UUID | null;
-  match_type: 'pool' | 'bracket';
-};
-
-type Standing = {
-  teamId: UUID;
-  name: string;
-  wins: number;
-  losses: number;
-  played: number;
-  setWon: number;
-  setLost: number;
-  setRatio: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  pointDiff: number;
-  seed: number | null;
-  poolId: UUID;
-};
+export type { Standing };
 
 const BRACKET_ID_NAMESPACE_UUID = '6b1f1d86-8c38-4d3f-85fb-9f5d4f0c1a9f';
 
 function uuidToBytes(uuid: string): Uint8Array {
-  const hex = uuid.replace(/-/g, '').toLowerCase();
-  if (!/^[0-9a-f]{32}$/.test(hex)) throw new Error(`Invalid UUID: ${uuid}`);
-  const bytes = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
+  const hex = uuid.replace(/-/g, '');
+  if (hex.length !== 32) throw new Error(`Invalid UUID: ${uuid}`);
+  const out = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
 }
 
 function bytesToUuid(bytes: Uint8Array): string {
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/** Deterministic UUID v5 so regenerating a bracket reuses the same match ids. */
 async function uuidV5(name: string, namespaceUuid = BRACKET_ID_NAMESPACE_UUID): Promise<string> {
-  const namespaceBytes = uuidToBytes(namespaceUuid);
+  const ns = uuidToBytes(namespaceUuid);
   const nameBytes = new TextEncoder().encode(name);
-  const input = new Uint8Array(namespaceBytes.length + nameBytes.length);
-  input.set(namespaceBytes, 0);
-  input.set(nameBytes, namespaceBytes.length);
-
-  if (!globalThis.crypto?.subtle?.digest) {
-    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-    throw new Error('crypto.subtle.digest is not available to generate deterministic UUIDs');
-  }
-
-  const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-1', input));
-  const out = digest.slice(0, 16);
-  out[6] = (out[6] & 0x0f) | 0x50;
-  out[8] = (out[8] & 0x3f) | 0x80;
-  return bytesToUuid(out);
+  const buf = new Uint8Array(ns.length + nameBytes.length);
+  buf.set(ns, 0);
+  buf.set(nameBytes, ns.length);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-1', buf));
+  const bytes = hash.slice(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  return bytesToUuid(bytes);
 }
 
-/**
- * Load tournament rules to get tiebreaker order; provide defaults if missing.
- */
-async function loadTiebreakers(tournamentId: string): Promise<NonNullable<AdvancementRules['tiebreakers']>> {
+// ---------------------------------------------------------------------------
+// Loading helpers
+// ---------------------------------------------------------------------------
+
+async function loadTournamentRules(tournamentId: string): Promise<AdvancementRules> {
+  const { data } = await supabase.from('tournaments').select('id,advancement_rules').eq('id', tournamentId).single();
+  return ((data as Tournament | null)?.advancement_rules ?? {}) as AdvancementRules;
+}
+
+async function loadTiebreakers(tournamentId: string): Promise<Tiebreaker[]> {
+  const rules = await loadTournamentRules(tournamentId);
+  return Array.isArray(rules.tiebreakers) && rules.tiebreakers.length ? (rules.tiebreakers as Tiebreaker[]) : DEFAULT_TIEBREAKERS;
+}
+
+/** Brackets for a tournament ordered for display. */
+export async function loadBrackets(tournamentId: string): Promise<Bracket[]> {
   const { data, error } = await supabase
-    .from('tournaments')
-    .select('id,advancement_rules')
-    .eq('id', tournamentId)
-    .single();
-
-  if (error || !data) {
-    // Default per CURRENT_STATUS.md
-    return ['head_to_head', 'set_ratio', 'point_diff', 'random'];
-  }
-
-  const rules = (data as Tournament).advancement_rules || {};
-  const order = Array.isArray(rules.tiebreakers) && rules.tiebreakers.length
-    ? rules.tiebreakers
-    : ['head_to_head', 'set_ratio', 'point_diff', 'random'];
-  return order as NonNullable<AdvancementRules['tiebreakers']>;
-}
-
-/**
- * Compute per-pool standings consistent with PublicPoolDetails.vue logic.
- * Returns a map of poolId -> sorted standings array.
- */
-export async function computePoolStandings(tournamentId: string): Promise<Map<string, Standing[]>> {
-  // Teams
-  const { data: teamsData, error: teamsErr } = await supabase
-    .from('teams')
-    .select('id,pool_id,full_team_name,seed_in_pool')
-    .eq('tournament_id', tournamentId);
-
-  if (teamsErr) throw new Error(`Failed to load teams: ${teamsErr.message}`);
-
-  const teams = (teamsData as TeamRec[]) ?? [];
-  const byPoolTeams = new Map<string, TeamRec[]>();
-  for (const t of teams) {
-    if (!t.pool_id) continue;
-    const arr = byPoolTeams.get(t.pool_id) ?? [];
-    arr.push(t);
-    byPoolTeams.set(t.pool_id, arr);
-  }
-
-  // Pool matches
-  const { data: matchesData, error: matchesErr } = await supabase
-    .from('matches')
-    .select('id,pool_id,team1_id,team2_id,team1_score,team2_score,winner_id,match_type')
+    .from('brackets')
+    .select('*')
     .eq('tournament_id', tournamentId)
-    .eq('match_type', 'pool');
-
-  if (matchesErr) throw new Error(`Failed to load matches: ${matchesErr.message}`);
-
-  const matches = (matchesData as MatchRec[]) ?? [];
-  const byPoolMatches = new Map<string, MatchRec[]>();
-  for (const m of matches) {
-    if (!m.pool_id) continue;
-    const arr = byPoolMatches.get(m.pool_id) ?? [];
-    arr.push(m);
-    byPoolMatches.set(m.pool_id, arr);
-  }
-
-  const tiebreakers = await loadTiebreakers(tournamentId);
-  const result = new Map<string, Standing[]>();
-
-  for (const [poolId, poolTeams] of byPoolTeams.entries()) {
-    // Base stats
-    const base: Record<string, Standing> = {};
-    for (const t of poolTeams) {
-      base[t.id] = {
-        teamId: t.id,
-        name: t.full_team_name,
-        wins: 0,
-        losses: 0,
-        played: 0,
-        setWon: 0,
-        setLost: 0,
-        setRatio: 0,
-        pointsFor: 0,
-        pointsAgainst: 0,
-        pointDiff: 0,
-        seed: t.seed_in_pool ?? null,
-        poolId,
-      };
-    }
-
-    // Aggregate from completed pool matches
-    const pmatches = byPoolMatches.get(poolId) ?? [];
-    for (const m of pmatches) {
-      const completed = m.team1_score != null && m.team2_score != null;
-      if (!completed) continue;
-      const t1 = m.team1_id;
-      const t2 = m.team2_id;
-      if (!t1 || !t2) continue;
-      const s1 = m.team1_score ?? 0;
-      const s2 = m.team2_score ?? 0;
-
-      if (base[t1]) {
-        base[t1].played += 1;
-        base[t1].pointsFor += s1;
-        base[t1].pointsAgainst += s2;
-        base[t1].pointDiff += (s1 - s2);
-        if (m.winner_id === t1) {
-          base[t1].wins += 1;
-          base[t1].setWon += 1;
-        } else {
-          base[t1].losses += 1;
-          base[t1].setLost += 1;
-        }
-      }
-      if (base[t2]) {
-        base[t2].played += 1;
-        base[t2].pointsFor += s2;
-        base[t2].pointsAgainst += s1;
-        base[t2].pointDiff += (s2 - s1);
-        if (m.winner_id === t2) {
-          base[t2].wins += 1;
-          base[t2].setWon += 1;
-        } else {
-          base[t2].losses += 1;
-          base[t2].setLost += 1;
-        }
-      }
-    }
-
-    // Ratios
-    for (const id of Object.keys(base)) {
-      const st = base[id];
-      const setsTotal = st.setWon + st.setLost;
-      st.setRatio = setsTotal > 0 ? st.setWon / setsTotal : 0;
-    }
-
-    // Head-to-head helper within this pool
-    function headToHead(aId: string, bId: string): number {
-      const direct = (byPoolMatches.get(poolId) ?? []).find((m) => {
-        const pair = new Set([m.team1_id, m.team2_id]);
-        return pair.has(aId) && pair.has(bId) && m.team1_score != null && m.team2_score != null;
-      });
-      if (!direct) return 0;
-      if (direct.winner_id === aId) return -1;
-      if (direct.winner_id === bId) return 1;
-      return 0;
-    }
-
-    function cmp(a: Standing, b: Standing): number {
-      // Primary: wins desc
-      if (b.wins !== a.wins) return b.wins - a.wins;
-
-      for (const tb of tiebreakers) {
-        if (tb === 'head_to_head') {
-          // Only safe within the same pool; apply if exactly two-way tie on wins only
-          const tieGroupWinsA = a.wins;
-          const tieGroupWinsB = b.wins;
-          if (tieGroupWinsA === tieGroupWinsB) {
-            const h2h = headToHead(a.teamId, b.teamId);
-            if (h2h !== 0) return h2h;
-          }
-        } else if (tb === 'set_ratio') {
-          if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
-        } else if (tb === 'point_diff') {
-          if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-        } else if (tb === 'random') {
-          // Keep deterministic fallback using teamId hash-ish compare instead of randomness
-          const al = a.teamId.toString();
-          const bl = b.teamId.toString();
-          if (al !== bl) return al < bl ? -1 : 1;
-        }
-      }
-
-      // Seed asc as last deterministic
-      if (a.seed != null && b.seed != null && a.seed !== b.seed) return a.seed - b.seed;
-      return a.name.localeCompare(b.name);
-    }
-
-    const arr = Object.values(base).sort(cmp);
-    result.set(poolId, arr);
-  }
-
-  return result;
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`Failed to load brackets: ${error.message}`);
+  return ((data as Bracket[]) ?? []).map((b) => ({
+    ...b,
+    places: Array.isArray(b.places) ? b.places : [],
+    round_formats: Array.isArray(b.round_formats) ? b.round_formats : [],
+  }));
 }
 
 /**
- * Build the ordered seed list S: all advancers sorted by global standing (same rules as leaderboard).
- * Seed #1 = best overall, #2 = second overall, etc., so standard bracket slotting puts 1 vs 8, 2 vs 7, …
- * and keeps top teams on opposite halves until late rounds.
- *
- * `winners` / `runners` are still all pool 1st-place / 2nd-place advancers, each sub-sorted globally
- * (for callers that need that breakdown).
+ * Legacy tournaments (no rows in `brackets`): create a single "Main" bracket from the old
+ * advance-count-by-pool-size rule so they keep working.
  */
-export async function seedAdvancers(tournamentId: string): Promise<{ seeds: UUID[]; winners: UUID[]; runners: UUID[] }> {
-  const standingsByPool = await computePoolStandings(tournamentId);
-  const tiebreakers = await loadTiebreakers(tournamentId);
-  const advMap = await loadAdvancementPoolRules(tournamentId);
-
-  // Comparator across pools using tiebreakers (H2H skipped cross-pool)
-  function cmpGlobal(a: Standing, b: Standing): number {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    for (const tb of tiebreakers) {
-      if (tb === 'head_to_head') {
-        continue; // no cross-pool H2H
-      } else if (tb === 'set_ratio') {
-        if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
-      } else if (tb === 'point_diff') {
-        if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-      } else if (tb === 'random') {
-        const al = a.teamId.toString();
-        const bl = b.teamId.toString();
-        if (al !== bl) return al < bl ? -1 : 1;
-      }
-    }
-    if (a.seed != null && b.seed != null && a.seed !== b.seed) return a.seed - b.seed;
-    return a.name.localeCompare(b.name);
-  }
-
-  type Advancer = { standing: Standing; poolFinish: number };
-
-  const poolIds = Array.from(standingsByPool.keys());
-  const advancers: Advancer[] = [];
-
-  for (const pid of poolIds) {
-    const standings = standingsByPool.get(pid) ?? [];
-    const size = standings.length;
-    const advCount = advMap.get(size) ?? 0;
-    for (let pos = 0; pos < advCount; pos++) {
-      if (standings[pos]) {
-        advancers.push({ standing: standings[pos], poolFinish: pos });
-      }
-    }
-  }
-
-  advancers.sort((a, b) => cmpGlobal(a.standing, b.standing));
-  const seeds = advancers.map((a) => a.standing.teamId);
-
-  const winners = advancers
-    .filter((a) => a.poolFinish === 0)
-    .sort((a, b) => cmpGlobal(a.standing, b.standing))
-    .map((a) => a.standing.teamId);
-  const runners = advancers
-    .filter((a) => a.poolFinish === 1)
-    .sort((a, b) => cmpGlobal(a.standing, b.standing))
-    .map((a) => a.standing.teamId);
-
-  return { seeds, winners, runners };
+export async function ensureBrackets(tournamentId: string): Promise<Bracket[]> {
+  const existing = await loadBrackets(tournamentId);
+  if (existing.length) return existing;
+  const rules = await loadTournamentRules(tournamentId);
+  const maxAdvance = Math.max(2, ...((rules.pools ?? []).map((p) => Number(p.advanceCount) || 0)));
+  const places = Array.from({ length: maxAdvance }, (_, i) => i + 1);
+  const { error } = await supabase.from('brackets').insert({
+    tournament_id: tournamentId,
+    name: 'Main',
+    sort_order: 0,
+    places,
+    round_formats: [],
+  });
+  if (error) throw new Error(`Failed to create default bracket: ${error.message}`);
+  return loadBrackets(tournamentId);
 }
 
-/**
- * Utilities for bracket layout.
- */
-function nextPowerOfTwoCeil(n: number, max: number = 64): number {
-  if (n <= 1) return 2;
-  let p = 1;
-  while (p < n) p <<= 1;
-  if (p > max) return -1;
-  return p;
+/** Per-pool standings with finishing places (same logic the public pages use). */
+export async function computePoolStandings(tournamentId: string): Promise<Map<string, Standing[]>> {
+  const [{ data: teams, error: tErr }, { data: matches, error: mErr }, tiebreakers] = await Promise.all([
+    supabase.from('teams').select('id,pool_id,full_team_name,seed_in_pool,seed_global').eq('tournament_id', tournamentId),
+    supabase
+      .from('matches')
+      .select('id,pool_id,team1_id,team2_id,team1_score,team2_score,winner_id,set_scores,best_of')
+      .eq('tournament_id', tournamentId)
+      .eq('match_type', 'pool'),
+    loadTiebreakers(tournamentId),
+  ]);
+  if (tErr) throw new Error(`Failed to load teams: ${tErr.message}`);
+  if (mErr) throw new Error(`Failed to load matches: ${mErr.message}`);
+  return rankAllPools((teams as any[]) ?? [], (matches as any[]) ?? [], tiebreakers);
 }
 
-/**
- * Generate standard seed slot order for a power-of-two bracket size.
- * Uses a recursive pattern:
- *  B=2: [1,2]
- *  B=4: [1,4,2,3]
- *  B=8: [1,8,4,5,2,7,3,6]
- *  B=16: [1,16,8,9,4,13,5,12,2,15,7,10,3,14,6,11]
- */
-function seedSlotsForSize(B: number): number[] {
-  if (B < 2 || (B & (B - 1)) !== 0) throw new Error(`seedSlotsForSize requires power-of-two, got ${B}`);
-  if (B === 2) return [1, 2];
-  const prev = seedSlotsForSize(B >> 1);
-  const res: number[] = [];
-  for (const s of prev) {
-    res.push(s);
-    res.push(B + 1 - s);
-  }
-  return res;
+/** Seeded team ids for one bracket. */
+export async function seedBracket(tournamentId: string, bracket: Pick<Bracket, 'places'>): Promise<Standing[]> {
+  const standings = await computePoolStandings(tournamentId);
+  return seedForPlaces(standings, bracket.places);
 }
 
+/** Format for a bracket round (1-based round, totalRounds = log2(size)). */
+export function roundFormatFor(bracket: Pick<Bracket, 'round_formats'>, round: number, totalRounds: number): MatchFormat {
+  const fromEnd = totalRounds - round + 1;
+  const f = (bracket.round_formats ?? []).find((r) => Number(r.fromEnd) === fromEnd);
+  if (!f) return DEFAULT_SINGLE_SET;
+  return normalizeFormat(f, f.bestOf === 3 ? DEFAULT_MATCH_PLAY : DEFAULT_SINGLE_SET);
+}
 
-/**
- * Generate bracket matches with byes applied.
- */
-export async function generateBracket(tournamentId: string): Promise<{ inserted: number; bracketSize: number; rounds: number; errors: string[] }> {
+/** Default round formats for new brackets: semifinal + final best of 3 (21, 21, 15); earlier rounds 1 set to 21. */
+export function defaultRoundFormats(): BracketRoundFormat[] {
+  return [
+    { fromEnd: 1, ...DEFAULT_MATCH_PLAY },
+    { fromEnd: 2, ...DEFAULT_MATCH_PLAY },
+    { fromEnd: 3, ...DEFAULT_SINGLE_SET },
+    { fromEnd: 4, ...DEFAULT_SINGLE_SET },
+    { fromEnd: 5, ...DEFAULT_SINGLE_SET },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Generation
+// ---------------------------------------------------------------------------
+
+export type GenerateBracketResult = { inserted: number; bracketSize: number; rounds: number; teams: number; errors: string[] };
+
+async function updateTournamentPhase(tournamentId: string) {
+  const { data } = await supabase.from('matches').select('id').eq('tournament_id', tournamentId).eq('match_type', 'bracket').limit(1);
+  const hasBracket = (data ?? []).length > 0;
+  await supabase
+    .from('tournaments')
+    .update(
+      hasBracket
+        ? { status: 'bracket', bracket_generated_at: new Date().toISOString() }
+        : { status: 'pool_play', bracket_started: false, bracket_generated_at: null }
+    )
+    .eq('id', tournamentId);
+}
+
+/** Generate (or regenerate) one bracket. Existing matches of this bracket are replaced. */
+export async function generateBracket(tournamentId: string, bracketId: string): Promise<GenerateBracketResult> {
   const errors: string[] = [];
+  const brackets = await loadBrackets(tournamentId);
+  const bracket = brackets.find((b) => b.id === bracketId);
+  if (!bracket) return { inserted: 0, bracketSize: 0, rounds: 0, teams: 0, errors: ['Bracket not found.'] };
 
-  // Attempt to reset any existing bracket matches before generation.
-  // Note: In some Supabase RLS configurations, delete may be a silent no-op (204, 0 rows) for anon users.
-  // We use UPSERT later to avoid unique constraint failures even when deletes are blocked.
-  {
-    const { error: delErr } = await supabase
-      .from('matches')
-      .delete()
-      .eq('tournament_id', tournamentId)
-      .eq('match_type', 'bracket');
-    if (delErr) {
-      errors.push(`Failed to delete existing bracket (continuing with upsert): ${delErr.message}`);
-    }
-  }
-
-  // Reuse existing match IDs by (round,index) so we don't create duplicates when deletes are blocked by RLS.
-  const existingIdByKey = new Map<string, string>();
-  {
-    const { data: existing, error: exErr } = await supabase
-      .from('matches')
-      .select('id,bracket_round,bracket_match_index')
-      .eq('tournament_id', tournamentId)
-      .eq('match_type', 'bracket');
-    if (!exErr && Array.isArray(existing)) {
-      for (const m of existing as any[]) {
-        if (m?.id && m?.bracket_round != null && m?.bracket_match_index != null) {
-          const key = `${m.bracket_round}:${m.bracket_match_index}`;
-          if (!existingIdByKey.has(key)) existingIdByKey.set(key, m.id);
-        }
-      }
-    }
-  }
-
-  // Build seeds following advancement rules
-  const { seeds } = await seedAdvancers(tournamentId);
+  const seeds = (await seedBracket(tournamentId, bracket)).map((s) => s.teamId);
   const N = seeds.length;
-
-  if (N === 0) {
-    return { inserted: 0, bracketSize: 0, rounds: 0, errors: ['No advancing teams found (check pool advancement rules and scores).'] };
+  if (N < 2) {
+    return { inserted: 0, bracketSize: 0, rounds: 0, teams: N, errors: [`${bracket.name}: needs at least 2 teams (check which pool places feed it).`] };
   }
-
-  const B = nextPowerOfTwoCeil(N, 64);
-  if (B === -1) {
-    return { inserted: 0, bracketSize: 0, rounds: 0, errors: ['Total advancers exceed supported bracket size (64).'] };
-  }
-
+  const B = bracketSizeFor(N, 64);
+  if (B === -1) return { inserted: 0, bracketSize: 0, rounds: 0, teams: N, errors: [`${bracket.name}: more than 64 teams is not supported.`] };
   const rounds = Math.log2(B);
 
-  // Map seed number (1-based) -> teamId or null and map into slot order
-  const seedNumToTeam: (string | null)[] = Array.from({ length: B }, () => null);
-  for (let seedNum = 1; seedNum <= N; seedNum++) {
-    seedNumToTeam[seedNum - 1] = seeds[seedNum - 1];
-  }
-  const slotsSeedNums = seedSlotsForSize(B);
-  const level0: (string | null)[] = slotsSeedNums.map((seedNum) => (seedNum <= N ? seedNumToTeam[seedNum - 1] : null));
+  // Replace this bracket's matches.
+  const { error: delErr } = await supabase.from('matches').delete().eq('tournament_id', tournamentId).eq('bracket_id', bracketId);
+  if (delErr) return { inserted: 0, bracketSize: B, rounds, teams: N, errors: [`Failed to clear ${bracket.name}: ${delErr.message}`] };
 
-  // Prepare rows to insert
-  let totalInserted = 0;
+  const slots = seedSlotsForSize(B).map((seedNum) => (seedNum <= N ? seeds[seedNum - 1] : null));
   const rows: any[] = [];
-  const seenKeys = new Set<string>();
-
-  function pushRow(bracket_round: number, bracket_match_index: number, team1_id: string | null, team2_id: string | null) {
-    const k = `${bracket_round}:${bracket_match_index}`;
-    if (seenKeys.has(k)) {
-      // Avoid duplicate (round, index) rows client-side.
-      return;
-    }
-    seenKeys.add(k);
+  const push = async (round: number, index: number, t1: string | null, t2: string | null) => {
+    const fmt = roundFormatFor(bracket, round, rounds);
     rows.push({
-      id: existingIdByKey.get(k) ?? null,
+      id: await uuidV5(`tournament:${tournamentId}:bracket:${bracketId}:${round}:${index}`),
       tournament_id: tournamentId,
+      bracket_id: bracketId,
       pool_id: null,
-      round_number: bracket_round,
-      team1_id,
-      team2_id,
+      round_number: round,
+      team1_id: t1,
+      team2_id: t2,
       ref_team_id: null,
       team1_score: null,
       team2_score: null,
       winner_id: null,
+      set_scores: null,
+      best_of: fmt.bestOf,
+      set_targets: fmt.setTargets,
       match_type: 'bracket',
-      bracket_round,
-      bracket_match_index,
+      bracket_round: round,
+      bracket_match_index: index,
       is_live: false,
       live_score_team1: null,
       live_score_team2: null,
     });
+  };
+
+  for (let i = 0; i < B / 2; i++) {
+    const a = slots[2 * i] ?? null;
+    const b = slots[2 * i + 1] ?? null;
+    if (a || b) await push(1, i, a, b);
   }
-
-  // Build bracket with preliminary matches.
-  // We ALWAYS create R1 matches for any seeded position, even if it's a BYE (User A vs null).
-  // The auto-resolver at the end of this function will detect the BYE, set the winner, and move them to R2.
-  const r1Pairs = B >> 1;      // standard total R1 pairs in a full bracket
-
-  // Create Round 1 matches
-  for (let i = 0; i < r1Pairs; i++) {
-    const a = level0[2 * i] ?? null;
-    const b = level0[2 * i + 1] ?? null;
-
-    if (a || b) {
-      // Create match if at least one team is present (standard or BYE)
-      pushRow(1, i, a, b);
-    }
-    // If both null (empty bracket slot), we create nothing? 
-    // Actually, usually standard brackets are fully populated or empty. 
-    // If seeds are sparse, unused slots remain empty.
-  }
-
-  // Create later rounds as TBD (starting from Round 2)
   for (let r = 2; r <= rounds; r++) {
-    const matchCount = B >> r;
-    for (let i = 0; i < matchCount; i++) {
-      pushRow(r, i, null, null);
-    }
+    for (let i = 0; i < B >> r; i++) await push(r, i, null, null);
   }
 
+  // Byes: a round-1 match with one team is won automatically; place the team in round 2.
+  const byKey = new Map(rows.map((r) => [`${r.bracket_round}:${r.bracket_match_index}`, r]));
   for (const r of rows) {
-    if (!r.id) {
-      r.id = await uuidV5(`tournament:${tournamentId}:bracket:${r.bracket_round}:${r.bracket_match_index}`);
+    if (r.bracket_round !== 1) continue;
+    const only = r.team1_id && !r.team2_id ? r.team1_id : !r.team1_id && r.team2_id ? r.team2_id : null;
+    if (!only) continue;
+    r.winner_id = only;
+    const next = byKey.get(`2:${Math.floor(r.bracket_match_index / 2)}`);
+    if (next) {
+      if (r.bracket_match_index % 2 === 0) next.team1_id = only;
+      else next.team2_id = only;
     }
   }
 
-  if (rows.length > 0) {
-    // Upsert by primary key so this works even if the DB is missing a unique index on bracket columns.
-    const { error: upsertErr } = await supabase
-      .from('matches')
-      .upsert(rows, { onConflict: 'id' });
+  const { error: insErr } = await supabase.from('matches').upsert(rows, { onConflict: 'id' });
+  if (insErr) errors.push(`Failed to save ${bracket.name}: ${insErr.message}`);
 
-    if (upsertErr) {
-      errors.push(`Failed to insert bracket matches: ${upsertErr.message}`);
-    } else {
-      totalInserted += rows.length;
+  await supabase.from('brackets').update({ generated_at: new Date().toISOString(), started: false }).eq('id', bracketId);
+  await updateTournamentPhase(tournamentId);
 
-      // Best-effort cleanup: delete any old bracket matches not in this generated id-set.
-      // (If delete is blocked by RLS, this may silently no-op; bracket rendering will still be correct
-      // as long as bracket size/rounds are stable.)
-      try {
-        const allowedIds = new Set<string>(rows.map((r) => r.id as string));
-        const { data: existing, error: exErr } = await supabase
-          .from('matches')
-          .select('id')
-          .eq('tournament_id', tournamentId)
-          .eq('match_type', 'bracket');
-        if (!exErr && Array.isArray(existing)) {
-          const toDelete = existing
-            .map((m: any) => m.id as string);
-          const filtered = toDelete.filter((id: string) => id && !allowedIds.has(id));
-          if (filtered.length) {
-            const { error: delExtraErr } = await supabase
-              .from('matches')
-              .delete()
-              .in('id', filtered)
-              .eq('match_type', 'bracket');
-            if (delExtraErr) {
-              errors.push(`Failed to remove stale bracket matches: ${delExtraErr.message}`);
-            }
-          }
-        } else if (exErr) {
-          errors.push(`Failed to verify bracket matches after upsert: ${exErr.message}`);
-        }
-      } catch (e: any) {
-        errors.push(`Bracket cleanup failed: ${e?.message ?? String(e)}`);
-      }
-
-      // Auto-resolve Round 1 BYEs one level forward only (no cascading)
-      try {
-        const { data: all, error: loadErr } = await supabase
-          .from('matches')
-          .select('id,bracket_round,bracket_match_index,team1_id,team2_id,winner_id')
-          .eq('tournament_id', tournamentId)
-          .eq('match_type', 'bracket');
-
-        if (!loadErr && Array.isArray(all)) {
-          const byKey = new Map<string, any>();
-          for (const m of all) {
-            if (m.bracket_round != null && m.bracket_match_index != null) {
-              byKey.set(`${m.bracket_round}:${m.bracket_match_index}`, m);
-            }
-          }
-
-          for (const m of all) {
-            if (m.bracket_round !== 1) continue;
-            const a = m.team1_id as string | null;
-            const b = m.team2_id as string | null;
-            const hasA = !!a;
-            const hasB = !!b;
-            const exactlyOne = (hasA && !hasB) || (!hasA && hasB);
-            if (!exactlyOne || m.winner_id) continue;
-
-            const winnerId = (hasA ? a : b) as string;
-
-            // Set winner on the BYE match
-            await supabase
-              .from('matches')
-              .update({ winner_id: winnerId })
-              .eq('id', m.id)
-              .eq('match_type', 'bracket');
-
-            // Place winner into next round (R2) appropriate side, if empty
-            const nextRound = 2;
-            const nextIndex = Math.floor((m.bracket_match_index as number) / 2);
-            const side = ((m.bracket_match_index as number) % 2 === 0) ? 'team1_id' : 'team2_id';
-            const next = byKey.get(`${nextRound}:${nextIndex}`) as any | undefined;
-            if (next) {
-              const curVal = side === 'team1_id' ? next.team1_id : next.team2_id;
-              if (!curVal) {
-                const { error: upNextErr } = await supabase
-                  .from('matches')
-                  .update(side === 'team1_id' ? { team1_id: winnerId } : { team2_id: winnerId })
-                  .eq('id', next.id)
-                  .eq('match_type', 'bracket');
-                if (!upNextErr) {
-                  // keep memory in sync to avoid duplicate work
-                  if (side === 'team1_id') next.team1_id = winnerId;
-                  else next.team2_id = winnerId;
-                }
-              }
-            }
-          }
-        } else if (loadErr) {
-          errors.push(`Failed to load bracket matches for BYE processing: ${loadErr.message}`);
-        }
-      } catch (e: any) {
-        errors.push(`BYE auto-advance failed: ${e?.message ?? String(e)}`);
-      }
-    }
-  }
-
-  // Update tournament phase and timestamp (keep bracket_started=false)
-  {
-    const { error: upErr } = await supabase
-      .from('tournaments')
-      .update({ status: 'bracket', bracket_generated_at: new Date().toISOString() })
-      .eq('id', tournamentId);
-
-    if (upErr) errors.push(`Failed to update tournament status: ${upErr.message}`);
-  }
-
-  return { inserted: totalInserted, bracketSize: B, rounds, errors };
+  return { inserted: insErr ? 0 : rows.length, bracketSize: B, rounds, teams: N, errors };
 }
 
-/**
- * Load advancement counts per pool size from tournament rules.
- * Defaults: 3-team => 2 advance, 4-team => 2 advance, 5-team => 2 advance, 6-team => 3 advance.
- */
-async function loadAdvancementPoolRules(tournamentId: string): Promise<Map<number, number>> {
-  const map = new Map<number, number>();
-  // defaults
-  map.set(3, 2);
-  map.set(4, 2);
-  map.set(5, 2);
-  map.set(6, 3);
-
-  const { data, error } = await supabase
-    .from('tournaments')
-    .select('id,advancement_rules')
-    .eq('id', tournamentId)
-    .single();
-
-  if (!error && data) {
-    const adv = (data as Tournament).advancement_rules || {};
-    const pools = Array.isArray((adv as any).pools) ? (adv as any).pools as Array<{ fromPoolSize: number; advanceCount: number }> : [];
-    for (const r of pools) {
-      const size = Number(r.fromPoolSize);
-      const count = Number(r.advanceCount);
-      if (Number.isFinite(size) && Number.isFinite(count) && size >= 2 && count >= 1) {
-        map.set(size, count);
-      }
-    }
+/** Generate every bracket of a tournament. */
+export async function generateAllBrackets(tournamentId: string): Promise<{ results: Array<GenerateBracketResult & { bracketId: string; name: string }>; errors: string[] }> {
+  const brackets = await ensureBrackets(tournamentId);
+  const results: Array<GenerateBracketResult & { bracketId: string; name: string }> = [];
+  const errors: string[] = [];
+  for (const b of brackets) {
+    const r = await generateBracket(tournamentId, b.id);
+    results.push({ ...r, bracketId: b.id, name: b.name });
+    errors.push(...r.errors);
   }
-
-  return map;
+  return { results, errors };
 }
+
+/** Alias kept for existing callers: regenerate one bracket. */
+export async function rebuildBracket(tournamentId: string, bracketId: string): Promise<GenerateBracketResult> {
+  return generateBracket(tournamentId, bracketId);
+}
+
+/** Delete one bracket's matches (keeps the bracket definition). */
+export async function deleteBracketMatches(tournamentId: string, bracketId: string): Promise<{ deleted: number; errors: string[] }> {
+  const errors: string[] = [];
+  const { data } = await supabase.from('matches').select('id').eq('tournament_id', tournamentId).eq('bracket_id', bracketId);
+  const { error } = await supabase.from('matches').delete().eq('tournament_id', tournamentId).eq('bracket_id', bracketId);
+  if (error) errors.push(`Failed to delete bracket matches: ${error.message}`);
+  await supabase.from('brackets').update({ generated_at: null, started: false }).eq('id', bracketId);
+  await updateTournamentPhase(tournamentId);
+  return { deleted: (data ?? []).length, errors };
+}
+
+/** Delete all bracket matches and revert the tournament to pool play. */
+export async function deleteBracketAndRevertToPoolPlay(tournamentId: string): Promise<{ deleted: number; errors: string[] }> {
+  const errors: string[] = [];
+  const { data } = await supabase.from('matches').select('id').eq('tournament_id', tournamentId).eq('match_type', 'bracket');
+  const { error } = await supabase.from('matches').delete().eq('tournament_id', tournamentId).eq('match_type', 'bracket');
+  if (error) errors.push(`Failed to delete bracket matches: ${error.message}`);
+  await supabase.from('brackets').update({ generated_at: null, started: false }).eq('tournament_id', tournamentId);
+  await updateTournamentPhase(tournamentId);
+  return { deleted: (data ?? []).length, errors };
+}
+
+// ---------------------------------------------------------------------------
+// Prerequisites
+// ---------------------------------------------------------------------------
+
+export type BracketPlan = {
+  bracketId: string;
+  name: string;
+  places: number[];
+  teamCount: number;
+  bracketSize: number;
+  rounds: number;
+  exists: boolean;
+  started: boolean;
+};
 
 export type BracketPrereqReport = {
   ok: boolean;
@@ -645,377 +298,199 @@ export type BracketPrereqReport = {
     poolCount: number;
     teamCount: number;
     unscoredCount: number;
-    expectedAdvancers: number;
-    actualAdvancers: number;
     bracketExists: boolean;
-    bracketSize: number; // -1 if unsupported
-    rounds: number;      // 0 if unknown
   };
+  brackets: BracketPlan[];
   unscored: Array<{ matchId: string; poolId: string | null; poolName: string | null }>;
   teamsWithoutPool: number;
 };
 
 /**
- * Check whether the tournament is ready to build a bracket and report precise blockers.
- * - Pools must have >= 2 teams each (those with <2 are flagged).
- * - All pool matches must be scored (both team1_score and team2_score present when both teams are assigned).
- * - If no blockers, compute actual advancers via seedAdvancers() and report suggested bracket size/rounds.
- * - Flags when a bracket already exists (user should rebuild when allowed).
- * - Notes when default tiebreakers will be used.
+ * Readiness report: every pool match scored, pools have >= 2 teams, and each bracket's
+ * team count / size. Warns when one pool place feeds two brackets, and lists unplaced places.
  */
 export async function checkBracketPrerequisites(tournamentId: string): Promise<BracketPrereqReport> {
   const errors: string[] = [];
   const infos: string[] = [];
 
-  // Load tournament advancement rules to detect defaults usage
-  let usingDefaultTiebreakers = false;
-  {
-    const { data, error } = await supabase
-      .from('tournaments')
-      .select('id,advancement_rules')
-      .eq('id', tournamentId)
-      .single();
-    if (!error && data) {
-      const adv = (data as Tournament).advancement_rules || {};
-      if (!Array.isArray((adv as any).tiebreakers) || ((adv as any).tiebreakers || []).length === 0) {
-        usingDefaultTiebreakers = true;
-      }
-    }
-  }
-  if (usingDefaultTiebreakers) {
-    infos.push('Using default tiebreakers: head_to_head, set_ratio, point_diff, random.');
-  }
+  const [poolsRes, teamsRes, matchesRes] = await Promise.all([
+    supabase.from('pools').select('id,name').eq('tournament_id', tournamentId),
+    supabase.from('teams').select('id,pool_id').eq('tournament_id', tournamentId),
+    supabase
+      .from('matches')
+      .select('id,pool_id,team1_id,team2_id,team1_score,team2_score,match_type,bracket_id,winner_id')
+      .eq('tournament_id', tournamentId),
+  ]);
+  const pools = (poolsRes.data as Array<{ id: string; name: string }>) ?? [];
+  const teams = (teamsRes.data as Array<{ id: string; pool_id: string | null }>) ?? [];
+  const matches = (matchesRes.data as any[]) ?? [];
+  for (const r of [poolsRes, teamsRes, matchesRes]) if (r.error) errors.push(r.error.message);
 
-  // Advancement mapping
-  const advMap = await loadAdvancementPoolRules(tournamentId);
-  const supportedSizes = Array.from(advMap.keys()).sort((a, b) => a - b);
-
-  // Load pools
-  const { data: poolsData, error: poolsErr } = await supabase
-    .from('pools')
-    .select('id,name')
-    .eq('tournament_id', tournamentId);
-  if (poolsErr) {
-    return {
-      ok: false,
-      errors: [`Failed to load pools: ${poolsErr.message}`],
-      infos,
-      stats: {
-        poolCount: 0,
-        teamCount: 0,
-        unscoredCount: 0,
-        expectedAdvancers: 0,
-        actualAdvancers: 0,
-        bracketExists: false,
-        bracketSize: 0,
-        rounds: 0,
-      },
-      unscored: [],
-      teamsWithoutPool: 0,
-    };
-  }
-  const pools = (poolsData as Array<{ id: string; name: string }>) ?? [];
-  const poolNameById = new Map<string, string>();
-  for (const p of pools) poolNameById.set(p.id, p.name);
-
-  // Load teams
-  const { data: teamsData, error: teamsErr } = await supabase
-    .from('teams')
-    .select('id,pool_id')
-    .eq('tournament_id', tournamentId);
-  if (teamsErr) {
-    return {
-      ok: false,
-      errors: [`Failed to load teams: ${teamsErr.message}`],
-      infos,
-      stats: {
-        poolCount: pools.length,
-        teamCount: 0,
-        unscoredCount: 0,
-        expectedAdvancers: 0,
-        actualAdvancers: 0,
-        bracketExists: false,
-        bracketSize: 0,
-        rounds: 0,
-      },
-      unscored: [],
-      teamsWithoutPool: 0,
-    };
-  }
-  const teams = (teamsData as Array<{ id: string; pool_id: string | null }>) ?? [];
-  const teamCount = teams.length;
-  const teamsByPoolCount = new Map<string, number>();
+  const poolName = new Map(pools.map((p) => [p.id, p.name]));
+  const sizeByPool = new Map<string, number>();
   let teamsWithoutPool = 0;
   for (const t of teams) {
-    if (!t.pool_id) {
-      teamsWithoutPool += 1;
-      continue;
-    }
-    teamsByPoolCount.set(t.pool_id, (teamsByPoolCount.get(t.pool_id) ?? 0) + 1);
+    if (!t.pool_id) teamsWithoutPool++;
+    else sizeByPool.set(t.pool_id, (sizeByPool.get(t.pool_id) ?? 0) + 1);
   }
-
-  // Validate pool sizes and compute expected advancers from rules
-  let expectedAdvancers = 0;
   for (const p of pools) {
-    const sz = teamsByPoolCount.get(p.id) ?? 0;
-    if (sz < 2) {
-      errors.push(`Pool '${p.name}' has only ${sz} team(s). Need at least 2 to advance.`);
-      continue;
-    }
-    const adv = advMap.get(sz) ?? 0;
-    if (adv === 0) {
-      errors.push(`Unsupported pool size ${sz} in '${p.name}' for advancement. Supported: ${supportedSizes.join(', ')}.`);
-      continue;
-    }
-    expectedAdvancers += adv;
+    const sz = sizeByPool.get(p.id) ?? 0;
+    if (sz > 0 && sz < 2) errors.push(`Pool '${p.name}' has only ${sz} team. Need at least 2.`);
   }
-  if (teamsWithoutPool > 0) {
-    infos.push(`${teamsWithoutPool} team(s) are not assigned to any pool.`);
+  if (teamsWithoutPool > 0) infos.push(`${teamsWithoutPool} team(s) are not assigned to any pool.`);
+
+  const unscored = matches
+    .filter((m) => m.match_type === 'pool' && m.team1_id && m.team2_id && (m.team1_score == null || m.team2_score == null))
+    .map((m) => ({ matchId: m.id, poolId: m.pool_id, poolName: m.pool_id ? poolName.get(m.pool_id) ?? null : null }));
+  if (unscored.length) errors.push(`${unscored.length} pool match(es) are missing scores.`);
+
+  let brackets: Bracket[] = [];
+  try {
+    brackets = await loadBrackets(tournamentId);
+  } catch (e: any) {
+    errors.push(e?.message ?? String(e));
+  }
+  if (!brackets.length) {
+    infos.push('No brackets are set up yet. Add Gold / Silver / Bronze brackets in Tournament Setup, or a single "Main" bracket (top 2 of each pool) will be created.');
   }
 
-  // Load pool matches and find unscored
-  const { data: matchesData, error: matchesErr } = await supabase
-    .from('matches')
-    .select('id,pool_id,team1_id,team2_id,team1_score,team2_score,match_type')
-    .eq('tournament_id', tournamentId)
-    .eq('match_type', 'pool');
-  if (matchesErr) {
+  // Overlap / coverage of pool places
+  const maxPool = Math.max(0, ...sizeByPool.values());
+  const placeOwners = new Map<number, string[]>();
+  for (const b of brackets) for (const p of b.places) placeOwners.set(p, [...(placeOwners.get(p) ?? []), b.name]);
+  for (const [place, owners] of placeOwners) {
+    if (owners.length > 1) errors.push(`Pool place ${place} feeds more than one bracket (${owners.join(', ')}).`);
+  }
+  if (brackets.length) {
+    const unplaced = Array.from({ length: maxPool }, (_, i) => i + 1).filter((p) => !placeOwners.has(p));
+    if (unplaced.length) infos.push(`Pool place(s) ${unplaced.join(', ')} are not in any bracket; those teams finish after pool play.`);
+  }
+
+  // Per-bracket size (uses current standings; exact once all pool matches are scored)
+  let standings = new Map<string, Standing[]>();
+  try {
+    standings = await computePoolStandings(tournamentId);
+  } catch (e: any) {
+    errors.push(e?.message ?? String(e));
+  }
+  const plans: BracketPlan[] = brackets.map((b) => {
+    const n = seedForPlaces(standings, b.places).length;
+    const size = n >= 2 ? bracketSizeFor(n, 64) : 0;
+    const own = matches.filter((m) => m.bracket_id === b.id);
     return {
-      ok: false,
-      errors: [`Failed to load pool matches: ${matchesErr.message}`],
-      infos,
-      stats: {
-        poolCount: pools.length,
-        teamCount,
-        unscoredCount: 0,
-        expectedAdvancers,
-        actualAdvancers: 0,
-        bracketExists: false,
-        bracketSize: 0,
-        rounds: 0,
-      },
-      unscored: [],
-      teamsWithoutPool,
+      bracketId: b.id,
+      name: b.name,
+      places: b.places,
+      teamCount: n,
+      bracketSize: size,
+      rounds: size > 0 ? Math.log2(size) : 0,
+      exists: own.length > 0,
+      started: own.some((m) => m.team1_score != null && m.team2_id != null && m.team1_id != null),
     };
-  }
-  const poolMatches = (matchesData as Array<{
-    id: string;
-    pool_id: string | null;
-    team1_id: string | null;
-    team2_id: string | null;
-    team1_score: number | null;
-    team2_score: number | null;
-    match_type: 'pool' | 'bracket';
-  }>) ?? [];
-
-  const unscored: Array<{ matchId: string; poolId: string | null; poolName: string | null }> = [];
-  for (const m of poolMatches) {
-    const bothTeamsAssigned = m.team1_id != null && m.team2_id != null;
-    const anyScoreMissing = m.team1_score == null || m.team2_score == null;
-    if (bothTeamsAssigned && anyScoreMissing) {
-      unscored.push({
-        matchId: m.id,
-        poolId: m.pool_id,
-        poolName: m.pool_id ? (poolNameById.get(m.pool_id) ?? null) : null,
-      });
-    }
-  }
-  const unscoredCount = unscored.length;
-  if (unscoredCount > 0) {
-    errors.push(`${unscoredCount} pool match(es) are missing scores.`);
+  });
+  for (const p of plans) {
+    if (p.teamCount === 1) errors.push(`${p.name} would have only 1 team.`);
+    if (p.bracketSize === -1) errors.push(`${p.name} has more than 64 teams.`);
   }
 
-  // Check if a bracket already exists
-  let bracketExists = false;
-  {
-    const { data: existing, error } = await supabase
-      .from('matches')
-      .select('id')
-      .eq('tournament_id', tournamentId)
-      .eq('match_type', 'bracket')
-      .limit(1);
-    if (!error) {
-      bracketExists = (existing ?? []).length > 0;
-      if (bracketExists) {
-        errors.push('Bracket already exists. Use Rebuild Bracket to overwrite when allowed.');
-      }
-    }
-  }
-
-  // Compute actual advancers only when there are no unscored matches and no size errors
-  let actualAdvancers = 0;
-  let bracketSize = 0;
-  let rounds = 0;
-
-  if (errors.filter(e => e.includes('Pool') || e.includes('Unsupported pool size')).length === 0 && unscoredCount === 0) {
-    try {
-      const { seeds } = await seedAdvancers(tournamentId);
-      actualAdvancers = seeds.length;
-
-      if (actualAdvancers === 0) {
-        errors.push('No advancing teams found (check pool advancement rules and scores).');
-      } else {
-        const B = nextPowerOfTwoCeil(actualAdvancers, 64);
-        bracketSize = B;
-        rounds = B > 0 ? Math.log2(B) : 0;
-        if (B === -1) {
-          errors.push('Total advancers exceed supported bracket size (64).');
-        }
-      }
-    } catch (e: any) {
-      errors.push(`Failed to compute advancers: ${e?.message ?? String(e)}`);
-    }
-  }
-
-  // Inconsistencies
-  if (expectedAdvancers >= 2 && actualAdvancers > 0 && actualAdvancers !== expectedAdvancers) {
-    infos.push(`Expected ${expectedAdvancers} advancers (per pool rules), computed ${actualAdvancers}.`);
-  }
-
+  const bracketExists = matches.some((m) => m.match_type === 'bracket');
   return {
     ok: errors.length === 0,
     errors,
     infos,
-    stats: {
-      poolCount: pools.length,
-      teamCount,
-      unscoredCount,
-      expectedAdvancers,
-      actualAdvancers,
-      bracketExists,
-      bracketSize,
-      rounds,
-    },
+    stats: { poolCount: pools.length, teamCount: teams.length, unscoredCount: unscored.length, bracketExists },
+    brackets: plans,
     unscored,
     teamsWithoutPool,
   };
 }
 
-/**
- * Rebuild bracket unconditionally (always deletes existing bracket matches, then regenerates).
- * Warning: this will wipe existing bracket matches and any recorded scores.
- */
-export async function rebuildBracket(tournamentId: string): Promise<{ inserted: number; bracketSize: number; rounds: number; errors: string[] }> {
+// ---------------------------------------------------------------------------
+// Advancing winners / undoing results
+// ---------------------------------------------------------------------------
 
-  // Delete existing bracket matches (if any)
-  const { error: delErr } = await supabase
+type BracketMatchRow = {
+  id: string;
+  bracket_id: string | null;
+  match_type: string;
+  bracket_round: number | null;
+  bracket_match_index: number | null;
+  winner_id: string | null;
+  team1_id: string | null;
+  team2_id: string | null;
+  team1_score: number | null;
+  team2_score: number | null;
+};
+
+async function loadNextMatch(tournamentId: string, m: BracketMatchRow) {
+  let q = supabase
     .from('matches')
-    .delete()
+    .select('id,team1_id,team2_id,team1_score,team2_score,winner_id')
     .eq('tournament_id', tournamentId)
-    .eq('match_type', 'bracket');
-
-  if (delErr) {
-    return { inserted: 0, bracketSize: 0, rounds: 0, errors: [`Failed to delete existing bracket: ${delErr.message}`] };
-  }
-
-  // Generate again
-  return await generateBracket(tournamentId);
+    .eq('match_type', 'bracket')
+    .eq('bracket_round', (m.bracket_round as number) + 1)
+    .eq('bracket_match_index', Math.floor((m.bracket_match_index as number) / 2));
+  q = m.bracket_id ? q.eq('bracket_id', m.bracket_id) : q.is('bracket_id', null);
+  const { data } = await q.maybeSingle();
+  return data as Pick<BracketMatchRow, 'id' | 'team1_id' | 'team2_id' | 'team1_score' | 'team2_score' | 'winner_id'> | null;
 }
 
-/**
- * Delete all bracket matches and revert tournament phase back to pool play.
- */
-export async function deleteBracketAndRevertToPoolPlay(tournamentId: string): Promise<{ deleted: number; errors: string[] }> {
-  const errors: string[] = [];
-  let deleted = 0;
-
-  const { data: existingRows, error: countErr } = await supabase
-    .from('matches')
-    .select('id')
-    .eq('tournament_id', tournamentId)
-    .eq('match_type', 'bracket');
-  if (countErr) {
-    errors.push(`Failed to inspect existing bracket matches: ${countErr.message}`);
-  } else {
-    deleted = (existingRows ?? []).length;
-  }
-
-  const { error: deleteErr } = await supabase
-    .from('matches')
-    .delete()
-    .eq('tournament_id', tournamentId)
-    .eq('match_type', 'bracket');
-  if (deleteErr) {
-    errors.push(`Failed to delete bracket matches: ${deleteErr.message}`);
-  }
-
-  const { error: updateErr } = await supabase
-    .from('tournaments')
-    .update({
-      status: 'pool_play',
-      bracket_started: false,
-      bracket_generated_at: null,
-    })
-    .eq('id', tournamentId);
-  if (updateErr) {
-    errors.push(`Failed to revert tournament phase: ${updateErr.message}`);
-  }
-
-  return { deleted, errors };
-}
-
-// --- Auto-advance winner into next round helper (appended) ---
+/** After a bracket match has a winner, place the winner into the next round (never overwrites a different team). */
 export async function advanceWinnerToNextById(tournamentId: string, matchId: string): Promise<{ updatedNext: boolean; error?: string }> {
-  try {
-    // Load current match minimal fields
-    const { data: m, error: mErr } = await supabase
-      .from('matches')
-      .select('id, match_type, bracket_round, bracket_match_index, winner_id')
-      .eq('tournament_id', tournamentId)
-      .eq('id', matchId)
-      .single();
-
-    if (mErr || !m) {
-      return { updatedNext: false, error: mErr?.message || 'Match not found' };
-    }
-    if (m.match_type !== 'bracket' || m.bracket_round == null || m.bracket_match_index == null) {
-      return { updatedNext: false, error: 'Not a bracket match or missing bracket indices' };
-    }
-    if (!m.winner_id) {
-      return { updatedNext: false, error: 'Winner not set' };
-    }
-
-    const curIndex: number = m.bracket_match_index as number;
-    const nextRound: number = (m.bracket_round as number) + 1;
-    const nextIndex: number = Math.floor(curIndex / 2);
-    const side: 'team1_id' | 'team2_id' = (curIndex % 2 === 0) ? 'team1_id' : 'team2_id';
-
-    // Load next round target match
-    const { data: next, error: nErr } = await supabase
-      .from('matches')
-      .select('id, team1_id, team2_id')
-      .eq('tournament_id', tournamentId)
-      .eq('match_type', 'bracket')
-      .eq('bracket_round', nextRound)
-      .eq('bracket_match_index', nextIndex)
-      .single();
-
-    // If next match not found (i.e., final already), nothing to update
-    if (nErr || !next) {
-      return { updatedNext: false, error: nErr?.message || 'No next match (final or missing row)' };
-    }
-
-    // Do not overwrite if already set to a different team (respect manual control)
-    const currentVal = side === 'team1_id' ? next.team1_id : next.team2_id;
-    if (currentVal && currentVal !== m.winner_id) {
-      return { updatedNext: false, error: 'Next slot already filled by a different team; not overwriting' };
-    }
-    if (currentVal === m.winner_id) {
-      return { updatedNext: false }; // Already set correctly
-    }
-
-    const updatePayload = side === 'team1_id' ? { team1_id: m.winner_id } : { team2_id: m.winner_id };
-    const { error: upErr } = await supabase
-      .from('matches')
-      .update(updatePayload)
-      .eq('id', next.id)
-      .eq('match_type', 'bracket');
-
-    if (upErr) {
-      return { updatedNext: false, error: upErr.message };
-    }
-    return { updatedNext: true };
-  } catch (e: any) {
-    return { updatedNext: false, error: e?.message ?? String(e) };
+  const { data: m, error } = await supabase
+    .from('matches')
+    .select('id,bracket_id,match_type,bracket_round,bracket_match_index,winner_id,team1_id,team2_id,team1_score,team2_score')
+    .eq('tournament_id', tournamentId)
+    .eq('id', matchId)
+    .single();
+  if (error || !m) return { updatedNext: false, error: error?.message || 'Match not found' };
+  const row = m as BracketMatchRow;
+  if (row.match_type !== 'bracket' || row.bracket_round == null || row.bracket_match_index == null) {
+    return { updatedNext: false, error: 'Not a bracket match' };
   }
+  if (!row.winner_id) return { updatedNext: false, error: 'Winner not set' };
+
+  if (row.bracket_id) await supabase.from('brackets').update({ started: true }).eq('id', row.bracket_id);
+
+  const next = await loadNextMatch(tournamentId, row);
+  if (!next) return { updatedNext: false }; // final
+  const side = row.bracket_match_index % 2 === 0 ? 'team1_id' : 'team2_id';
+  const loser = row.winner_id === row.team1_id ? row.team2_id : row.team1_id;
+  const cur = next[side];
+  if (cur === row.winner_id) return { updatedNext: false };
+  // Replace an empty slot, or the previous result's team when a score was corrected (only if the next match is unplayed).
+  if (cur && cur !== loser) return { updatedNext: false, error: 'Next slot already filled by a different team; not overwriting' };
+  if (cur && next.team1_score != null) return { updatedNext: false, error: 'Next match already has a score; not changing it' };
+  const { error: upErr } = await supabase.from('matches').update({ [side]: row.winner_id }).eq('id', next.id);
+  if (upErr) return { updatedNext: false, error: upErr.message };
+  return { updatedNext: true };
+}
+
+/**
+ * Clear a bracket match's result and remove its winner from the next round,
+ * as long as the next match has not been played yet.
+ */
+export async function clearBracketResult(tournamentId: string, matchId: string): Promise<{ error?: string }> {
+  const { data: m, error } = await supabase
+    .from('matches')
+    .select('id,bracket_id,match_type,bracket_round,bracket_match_index,winner_id,team1_id,team2_id,team1_score,team2_score')
+    .eq('id', matchId)
+    .single();
+  if (error || !m) return { error: error?.message || 'Match not found' };
+  const row = m as BracketMatchRow;
+  if (row.match_type === 'bracket' && row.winner_id && row.bracket_round != null) {
+    const next = await loadNextMatch(tournamentId, row);
+    if (next) {
+      if (next.team1_score != null || next.winner_id) {
+        return { error: 'The next-round match already has a result. Clear that one first.' };
+      }
+      const side = (row.bracket_match_index as number) % 2 === 0 ? 'team1_id' : 'team2_id';
+      if (next[side] === row.winner_id) await supabase.from('matches').update({ [side]: null }).eq('id', next.id);
+    }
+  }
+  const { error: upErr } = await supabase
+    .from('matches')
+    .update({ team1_score: null, team2_score: null, set_scores: null, winner_id: null, is_live: false, live_score_team1: null, live_score_team2: null })
+    .eq('id', matchId);
+  return upErr ? { error: upErr.message } : {};
 }

@@ -24,12 +24,12 @@ const props = defineProps<Props>();
     class="group relative flex items-center gap-3 rounded-none"
     :class="[
       props.standaloneCard ? 'h-full min-h-[4.5rem] border-0 px-5 py-4' : 'border-b px-4 py-3.5 last:border-b-0',
-      props.standaloneCard ? '' : props.cohesive ? 'border-slate-700/55' : 'border-white/15',
+      props.standaloneCard ? '' : props.cohesive ? 'border-tone-700/55' : 'border-ink/15',
       'transition-colors duration-150',
       props.disabled
         ? 'opacity-60 cursor-not-allowed'
         : props.cohesive
-          ? 'hover:bg-slate-800/55 hover:border-amber-500/15 cursor-pointer'
+          ? 'hover:bg-tone-800/55 hover:border-amber-500/15 cursor-pointer'
           : 'hover:bg-white/5 cursor-pointer',
     ]"
     role="button"
@@ -41,7 +41,7 @@ const props = defineProps<Props>();
           'pi',
           props.icon || 'pi-circle',
           'text-xl',
-          props.cohesive ? 'text-slate-400 transition-colors group-hover:text-amber-400/90' : 'text-white',
+          props.cohesive ? 'text-tone-400 transition-colors group-hover:text-amber-400/90' : 'text-ink',
         ]"
       ></i>
     </div>
@@ -49,14 +49,14 @@ const props = defineProps<Props>();
       <div
         :class="[
           'font-semibold tracking-wide truncate',
-          props.cohesive ? 'text-slate-100 group-hover:text-white' : '',
+          props.cohesive ? 'text-tone-100 group-hover:text-ink' : '',
         ]"
       >
         {{ props.title }}
       </div>
       <div
         v-if="props.description"
-        :class="['text-sm truncate', props.cohesive ? 'text-slate-500 group-hover:text-slate-400' : 'text-white/80']"
+        :class="['text-sm truncate', props.cohesive ? 'text-tone-500 group-hover:text-tone-400' : 'text-ink/80']"
       >
         {{ props.description }}
       </div>
@@ -74,7 +74,7 @@ const props = defineProps<Props>();
                 : props.cohesive && props.badgeSeverity === 'danger'
                   ? 'border border-red-500/25 bg-red-500/10 text-red-300'
                   : props.cohesive
-                    ? 'border border-slate-600/50 bg-slate-800/80 text-slate-300'
+                    ? 'border border-tone-600/50 bg-tone-800/80 text-tone-300'
                     : '',
             !props.cohesive && props.badgeSeverity === 'success' ? 'bg-green-500/20 text-green-300' : '',
             !props.cohesive && props.badgeSeverity === 'warn' ? 'bg-amber-500/20 text-amber-300' : '',
@@ -91,7 +91,7 @@ const props = defineProps<Props>();
           v-if="props.to && !props.disabled"
           :class="[
             'pi pi-chevron-right',
-            props.cohesive ? 'text-slate-500 transition-colors group-hover:text-amber-400/85' : 'text-white/80',
+            props.cohesive ? 'text-tone-500 transition-colors group-hover:text-amber-400/85' : 'text-ink/80',
           ]"
         ></i>
       </slot>

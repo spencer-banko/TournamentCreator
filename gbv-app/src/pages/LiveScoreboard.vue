@@ -197,7 +197,7 @@ onBeforeUnmount(async () => {
               :to="{ name: 'tournament-public', params: { accessCode } }"
               aria-label="Return to Tournament"
             />
-            <h2 class="text-2xl font-semibold text-white truncate">Live Scoreboard</h2>
+            <h2 class="text-2xl font-semibold text-ink truncate">Live Scoreboard</h2>
           </div>
           <div
             v-if="isLive"
@@ -209,7 +209,7 @@ onBeforeUnmount(async () => {
           </div>
         </div>
 
-        <p class="mt-1 text-white/80">
+        <p class="mt-1 text-ink/80">
           {{ matchLabel }}
         </p>
 
@@ -217,12 +217,12 @@ onBeforeUnmount(async () => {
           <div class="rounded-xl bg-white/10 ring-1 ring-white/20 p-6">
             <div class="grid grid-cols-2 items-center gap-6">
               <div class="text-center">
-                <div class="text-sm text-white/80">Team 1</div>
-                <div class="text-3xl sm:text-4xl font-extrabold text-white">{{ team1Id ? (team1Id && (team1Id in teamNameById) ? teamNameById[team1Id] : 'TBD') : 'TBD' }}</div>
+                <div class="text-sm text-ink/80">Team 1</div>
+                <div class="text-3xl sm:text-4xl font-extrabold text-ink">{{ team1Id ? (team1Id && (team1Id in teamNameById) ? teamNameById[team1Id] : 'TBD') : 'TBD' }}</div>
               </div>
               <div class="text-center">
-                <div class="text-sm text-white/80">Team 2</div>
-                <div class="text-3xl sm:text-4xl font-extrabold text-white">{{ team2Id ? (team2Id && (team2Id in teamNameById) ? teamNameById[team2Id] : 'TBD') : 'TBD' }}</div>
+                <div class="text-sm text-ink/80">Team 2</div>
+                <div class="text-3xl sm:text-4xl font-extrabold text-ink">{{ team2Id ? (team2Id && (team2Id in teamNameById) ? teamNameById[team2Id] : 'TBD') : 'TBD' }}</div>
               </div>
             </div>
 
@@ -237,7 +237,7 @@ onBeforeUnmount(async () => {
             </div>
           </div>
 
-          <div class="rounded-xl border border-dashed border-white/30 p-6 text-center text-white/80">
+          <div class="rounded-xl border border-dashed border-ink/30 p-6 text-center text-ink/80">
             This view updates in real-time when the live match row changes in Supabase.
           </div>
         </div>

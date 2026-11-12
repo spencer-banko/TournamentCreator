@@ -241,14 +241,14 @@ onBeforeUnmount(() => {
             :on-click="backToContext"
             :aria-label="backLabel"
           />
-          <h2 class="text-2xl font-semibold text-white truncate">Match</h2>
+          <h2 class="text-2xl font-semibold text-ink truncate">Match</h2>
         </div>
-        <div v-if="loading" class="text-sm text-white/80 shrink-0">Loading…</div>
+        <div v-if="loading" class="text-sm text-ink/80 shrink-0">Loading…</div>
       </div>
 
       <div v-if="match" class="mt-3">
         <div class="flex items-center justify-between">
-          <div class="text-sm text-white/80">
+          <div class="text-sm text-ink/80">
             Round {{ match.round_number ?? '—' }} • {{ match.match_type === 'bracket' ? 'Bracket' : 'Pool' }}
           </div>
           <div
@@ -261,13 +261,13 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="mt-2">
-          <div class="text-xl font-semibold text-white leading-tight">
+          <div class="text-xl font-semibold text-ink leading-tight">
             {{ nameFor(match.team1_id) }}
           </div>
-          <div class="text-sm font-medium text-white/70 leading-tight">
+          <div class="text-sm font-medium text-ink/70 leading-tight">
             vs
           </div>
-          <div class="text-xl font-semibold text-white leading-tight">
+          <div class="text-xl font-semibold text-ink leading-tight">
             {{ nameFor(match.team2_id) }}
           </div>
         </div>
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
           class="mt-5 rounded-2xl bg-white/10 p-4 text-white ring-2 ring-red-500/60"
         >
           <div class="flex items-center justify-between gap-3">
-            <div class="text-sm font-semibold uppercase tracking-wide text-white/80">Live Score</div>
+            <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">Live Score</div>
             <div class="inline-flex items-center gap-2 rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white whitespace-nowrap">
               <span class="size-2 rounded-full bg-white/90"></span>
               LIVE <span class="tabular-nums">{{ match.live_score_team1 ?? 0 }}-{{ match.live_score_team2 ?? 0 }}</span>
@@ -285,12 +285,12 @@ onBeforeUnmount(() => {
           </div>
           <div class="mt-3 grid grid-cols-2 gap-3">
             <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
-              <div class="text-xs font-medium text-white/70 truncate">{{ nameFor(match.team1_id) }}</div>
-              <div class="mt-1 text-4xl font-black tabular-nums text-white">{{ match.live_score_team1 ?? 0 }}</div>
+              <div class="text-xs font-medium text-ink/70 truncate">{{ nameFor(match.team1_id) }}</div>
+              <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.live_score_team1 ?? 0 }}</div>
             </div>
             <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
-              <div class="text-xs font-medium text-white/70 truncate">{{ nameFor(match.team2_id) }}</div>
-              <div class="mt-1 text-4xl font-black tabular-nums text-white">{{ match.live_score_team2 ?? 0 }}</div>
+              <div class="text-xs font-medium text-ink/70 truncate">{{ nameFor(match.team2_id) }}</div>
+              <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.live_score_team2 ?? 0 }}</div>
             </div>
           </div>
         </div>
@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
           class="mt-5 rounded-2xl bg-white/10 p-4 text-white ring-1 ring-white/20"
         >
           <div class="flex items-center justify-between gap-3">
-            <div class="text-sm font-semibold uppercase tracking-wide text-white/80">Final</div>
+            <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">Final</div>
             <div class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide bg-white/10 ring-1 ring-white/20 text-white whitespace-nowrap">
               <span class="tabular-nums">{{ finalScoreText(match) }}</span>
             </div>
@@ -308,32 +308,32 @@ onBeforeUnmount(() => {
           <div class="mt-3 grid grid-cols-2 gap-3">
             <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
               <div
-                class="text-xs font-medium text-white/70 truncate"
-                :class="winnerSide(match) === 2 ? 'opacity-70 line-through decoration-2 decoration-white/70' : ''"
+                class="text-xs font-medium text-ink/70 truncate"
+                :class="winnerSide(match) === 2 ? 'opacity-70 line-through decoration-2 decoration-ink/70' : ''"
               >
                 {{ nameFor(match.team1_id) }}
               </div>
-              <div class="mt-1 text-4xl font-black tabular-nums text-white">{{ match.team1_score ?? 0 }}</div>
+              <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.team1_score ?? 0 }}</div>
             </div>
             <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
               <div
-                class="text-xs font-medium text-white/70 truncate"
-                :class="winnerSide(match) === 1 ? 'opacity-70 line-through decoration-2 decoration-white/70' : ''"
+                class="text-xs font-medium text-ink/70 truncate"
+                :class="winnerSide(match) === 1 ? 'opacity-70 line-through decoration-2 decoration-ink/70' : ''"
               >
                 {{ nameFor(match.team2_id) }}
               </div>
-              <div class="mt-1 text-4xl font-black tabular-nums text-white">{{ match.team2_score ?? 0 }}</div>
+              <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.team2_score ?? 0 }}</div>
             </div>
           </div>
           <div class="mt-3 flex items-center justify-between gap-3">
-            <div class="text-sm text-white/80">Winner</div>
+            <div class="text-sm text-ink/80">Winner</div>
             <div
               v-if="winnerName(match)"
-              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide uppercase bg-amber-300/90 text-slate-900 ring-1 ring-amber-200/70 max-w-[70%] truncate"
+              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide uppercase bg-amber-300/90 text-tone-900 ring-1 ring-amber-200/70 max-w-[70%] truncate"
             >
               {{ winnerName(match) }}
             </div>
-            <div v-else class="text-sm text-white/70">—</div>
+            <div v-else class="text-sm text-ink/70">—</div>
           </div>
         </div>
 

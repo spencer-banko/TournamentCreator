@@ -9,6 +9,23 @@
   --color-gbv-sand: #ede0d1;
   --color-gbv-bg: #ede0d1;
   --color-gbv-ink: #0f172a;
+
+  /* Theme-aware neutral scale ("tone") — GT = Tailwind slate (dark UI); ECVA inverts it (light UI).
+     Use tone-* instead of slate-* and text-ink instead of text-white for surfaces/text that follow the theme. */
+  --color-tone-50: #f8fafc;
+  --color-tone-100: #f1f5f9;
+  --color-tone-200: #e2e8f0;
+  --color-tone-300: #cbd5e1;
+  --color-tone-400: #94a3b8;
+  --color-tone-500: #64748b;
+  --color-tone-600: #475569;
+  --color-tone-700: #334155;
+  --color-tone-800: #1e293b;
+  --color-tone-900: #0f172a;
+  --color-tone-950: #020617;
+  --color-ink: #ffffff;
+  /* Contrasting surface for inputs/menus (white on dark GT; white on light ECVA too) */
+  --color-paper: #ffffff;
 }
 
 /* Page shell background — replaces hardcoded bg-[#0b1120] */
@@ -187,9 +204,9 @@ body {
 
 /* Confirm dialog on dark admin shell */
 .p-confirmdialog .p-dialog {
-  background: #0f172a !important;
-  color: #f8fafc !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: var(--color-tone-900) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid rgba(var(--ink-rgb), 0.12) !important;
 }
 .p-confirmdialog .p-dialog-header,
 .p-confirmdialog .p-dialog-content {
@@ -198,5 +215,5 @@ body {
 }
 .p-confirmdialog .p-dialog-footer {
   background: transparent !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(var(--ink-rgb), 0.1) !important;
 }

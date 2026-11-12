@@ -34,6 +34,8 @@ export interface GameRules {
     winBy2?: boolean;    // e.g., true = must win by 2
     // Optional per-pool-size overrides (JSON keys are strings)
     setTargetByPoolSize?: Record<string, number>;
+    /** Per-pool-size match format, e.g. { "3": { bestOf: 3, setTargets: [21,21,15] }, "4": { bestOf: 1, setTargets: [28] } } */
+    formatBySize?: Record<string, MatchFormat>;
   };
   bracket?: {
     setTarget?: number;
@@ -42,6 +44,43 @@ export interface GameRules {
     winBy2?: boolean;      // e.g., true = must win by 2
     thirdSetTarget?: number; // e.g., 15 when bestOf = 3
   };
+}
+
+/**
+ * Format of a single match: how many sets and what each set plays to.
+ * setTargets[i] is the target of set i+1 (missing entries reuse the last one).
+ */
+export interface MatchFormat {
+  bestOf: number;          // 1 or 3
+  setTargets: number[];    // e.g. [21] or [21, 21, 15]
+  cap?: number | null;     // hard cap (null/undefined = no cap)
+  winBy2?: boolean;        // default true
+}
+
+/** Per-round format inside a bracket, keyed by rounds from the end (1 = final, 2 = semifinal, ...). */
+export interface BracketRoundFormat extends MatchFormat {
+  fromEnd: number;
+}
+
+export interface SetScore {
+  t1: number;
+  t2: number;
+}
+
+/**
+ * brackets (Gold / Silver / Bronze ...)
+ */
+export interface Bracket {
+  id: UUID;
+  tournament_id: UUID;
+  name: string;
+  sort_order: number;
+  /** Pool finishing places (1-based) that feed this bracket. */
+  places: number[];
+  round_formats: BracketRoundFormat[];
+  generated_at: string | null;
+  started: boolean;
+  created_at?: string;
 }
 
 /**
@@ -104,6 +143,12 @@ export interface Match {
   winner_id: UUID | null;
   match_type: MatchType;
   bracket_round: number | null; // e.g., R1=1, QF=2, SF=3, F=4 depending on size
+  bracket_match_index?: number | null;
+  bracket_id?: UUID | null;      // which bracket (Gold/Silver/...) a bracket match belongs to
+  set_scores?: SetScore[] | null; // per-set scores for match play; team1_score/team2_score then hold sets won
+  best_of?: number | null;        // null/1 = single set
+  set_targets?: number[] | null;  // e.g. [21,21,15]
+  court?: string | null;
   is_live: boolean;
   live_score_team1: number | null;
   live_score_team2: number | null;
@@ -141,5 +186,6 @@ export interface DB {
   pools: Pool;
   teams: Team;
   matches: Match;
+  brackets: Bracket;
   schedule_templates: ScheduleTemplate;
 }

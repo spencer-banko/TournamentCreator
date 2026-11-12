@@ -134,7 +134,7 @@ onMounted(async () => {
 <template>
   <PublicLayout>
     <section class="p-5 sm:p-7">
-        <div class="mb-4 flex items-center gap-2 rounded-xl border border-slate-600/45 bg-slate-800/45 p-2">
+        <div class="mb-4 flex items-center gap-2 rounded-xl border border-tone-600/45 bg-tone-800/45 p-2">
           <router-link
             :to="{ name: 'public-pool-list', params: { accessCode } }"
             class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
@@ -145,14 +145,14 @@ onMounted(async () => {
           <router-link
             v-if="hasBracket"
             :to="{ name: 'public-bracket', params: { accessCode } }"
-            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-700/60"
+            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-tone-200 transition-colors hover:bg-tone-700/60"
           >
             Bracket
           </router-link>
           <button
             v-else
             type="button"
-            class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-400 ring-1 ring-slate-500/35"
+            class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-tone-400 ring-1 ring-tone-500/35"
             @click.prevent
           >
             <i class="pi pi-lock text-xs" aria-hidden="true" />
@@ -167,8 +167,8 @@ onMounted(async () => {
               aria-label="Return to Tournament"
             />
             <div class="min-w-0">
-              <h2 class="text-2xl font-semibold tracking-tight text-white">Pools</h2>
-              <p class="mt-1 text-slate-400">
+              <h2 class="text-2xl font-semibold tracking-tight text-ink">Pools</h2>
+              <p class="mt-1 text-tone-400">
                 Choose a pool to view standings and schedule.
               </p>
             </div>
@@ -180,25 +180,25 @@ onMounted(async () => {
             >
               Leaderboard
             </router-link>
-            <div v-if="loading" class="text-sm text-slate-400">Loading…</div>
+            <div v-if="loading" class="text-sm text-tone-400">Loading…</div>
           </div>
         </div>
 
         <div class="mt-6">
-          <div v-if="pools.length === 0" class="text-sm text-slate-400">
+          <div v-if="pools.length === 0" class="text-sm text-tone-400">
             No pools yet.
           </div>
           <ul v-else class="grid gap-3 sm:grid-cols-2">
             <li
               v-for="p in pools"
               :key="p.id"
-              class="cursor-pointer rounded-xl border border-slate-600/45 bg-slate-800/50 p-4 text-white shadow-lg shadow-black/25 transition-colors hover:border-amber-500/25 hover:bg-slate-800/65"
+              class="cursor-pointer rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 text-ink shadow-lg shadow-black/25 transition-colors hover:border-amber-500/25 hover:bg-tone-800/65"
               @click="openPool(p.id)"
             >
               <div class="font-semibold">{{ p.name }}</div>
-              <div class="text-sm text-slate-400">Court: {{ p.court_assignment || 'TBD' }}</div>
-              <div v-if="seededFirstNamesByPoolId[p.id]?.length" class="mt-1 text-xs text-slate-500">
-                Players: <span class="font-medium text-slate-300">{{ seededFirstNamesByPoolId[p.id].join(', ') }}</span>
+              <div class="text-sm text-tone-400">Court: {{ p.court_assignment || 'TBD' }}</div>
+              <div v-if="seededFirstNamesByPoolId[p.id]?.length" class="mt-1 text-xs text-tone-500">
+                Players: <span class="font-medium text-tone-300">{{ seededFirstNamesByPoolId[p.id].join(', ') }}</span>
               </div>
             </li>
           </ul>

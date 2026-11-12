@@ -191,17 +191,17 @@ onMounted(async () => {
             :to="{ name: 'tournament-public', params: { accessCode } }"
             aria-label="Return to Tournament"
           />
-          <h2 class="text-2xl font-semibold text-white truncate">Score Entry</h2>
+          <h2 class="text-2xl font-semibold text-ink truncate">Score Entry</h2>
         </div>
-        <div v-if="loading" class="text-sm text-white/80 shrink-0">Loading…</div>
+        <div v-if="loading" class="text-sm text-ink/80 shrink-0">Loading…</div>
       </div>
-      <p class="mt-1 text-white/80">
+      <p class="mt-1 text-ink/80">
         Submit final scores for completed matches. Validation and tiebreakers apply on the server.
       </p>
 
       <div class="mt-6 grid gap-5">
         <div>
-          <label class="block text-sm font-medium text-white/80 mb-2">Select Match</label>
+          <label class="block text-sm font-medium text-ink/80 mb-2">Select Match</label>
           <Dropdown
             v-model="selectedMatch"
             :options="matches"
@@ -214,7 +214,7 @@ onMounted(async () => {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
-            <label class="block text-sm font-medium text-white/80 mb-2">{{ team1FinalScoreLabel }}</label>
+            <label class="block text-sm font-medium text-ink/80 mb-2">{{ team1FinalScoreLabel }}</label>
             <InputNumber
               v-model="team1Score"
               showButtons
@@ -230,7 +230,7 @@ onMounted(async () => {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-white/80 mb-2">{{ team2FinalScoreLabel }}</label>
+            <label class="block text-sm font-medium text-ink/80 mb-2">{{ team2FinalScoreLabel }}</label>
             <InputNumber
               v-model="team2Score"
               showButtons

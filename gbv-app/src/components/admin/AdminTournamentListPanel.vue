@@ -144,8 +144,8 @@ defineExpose({ loadTournaments, getTournaments });
       :class="[
         'admin-tournament-datatable rounded-xl border',
         variant === 'dashboard' || variant === 'setup'
-          ? 'border-slate-600/40 bg-slate-800/35'
-          : 'border-white/10',
+          ? 'border-tone-600/40 bg-tone-800/35'
+          : 'border-ink/10',
       ]"
       :loading="loading || deleting"
       tableClass="!text-base"
@@ -154,11 +154,11 @@ defineExpose({ loadTournaments, getTournaments });
         thead: {
           class:
             variant === 'dashboard' || variant === 'setup'
-              ? 'bg-slate-800/95 text-slate-200'
+              ? 'bg-tone-800/95 text-tone-200'
               : 'bg-white/10 text-white',
         },
         tbody: {
-          class: variant === 'dashboard' || variant === 'setup' ? 'text-slate-200' : 'text-white/90',
+          class: variant === 'dashboard' || variant === 'setup' ? 'text-tone-200' : 'text-ink/90',
         },
       }"
     >
@@ -166,46 +166,46 @@ defineExpose({ loadTournaments, getTournaments });
       <template v-if="variant === 'dashboard'">
         <Column
           header="#"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
           style="width: 2.75rem"
         >
           <template #body="{ index }">
-            <span class="text-base tabular-nums text-slate-400">{{ (index as number) + 1 }}</span>
+            <span class="text-base tabular-nums text-tone-400">{{ (index as number) + 1 }}</span>
           </template>
         </Column>
         <Column
           field="date"
           header="Date"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
           style="width: 8.5rem"
         >
           <template #body="{ data }">
-            <span class="text-base font-semibold text-white">{{ (data as Tournament).date }}</span>
+            <span class="text-base font-semibold text-ink">{{ (data as Tournament).date }}</span>
           </template>
         </Column>
         <Column
           field="name"
           header="Name"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
         >
           <template #body="{ data }">
-            <div class="text-lg font-semibold leading-snug text-white">{{ (data as Tournament).name }}</div>
+            <div class="text-lg font-semibold leading-snug text-ink">{{ (data as Tournament).name }}</div>
           </template>
         </Column>
         <Column
           field="access_code"
           header="Access code"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
           style="width: 10rem"
         >
           <template #body="{ data }">
-            <span class="font-mono text-base font-medium text-white">{{ (data as Tournament).access_code }}</span>
+            <span class="font-mono text-base font-medium text-ink">{{ (data as Tournament).access_code }}</span>
           </template>
         </Column>
         <Column
           header="Actions"
           style="width: 8rem"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
         >
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
@@ -246,22 +246,22 @@ defineExpose({ loadTournaments, getTournaments });
         <Column
           field="date"
           header="Date"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
           style="width: 8.5rem"
         >
           <template #body="{ data }">
-            <span class="text-base font-semibold text-white">{{ (data as Tournament).date }}</span>
+            <span class="text-base font-semibold text-ink">{{ (data as Tournament).date }}</span>
           </template>
         </Column>
-        <Column field="name" header="Name" headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50">
+        <Column field="name" header="Name" headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50">
           <template #body="{ data }">
-            <div class="text-lg font-semibold leading-snug text-white">{{ (data as Tournament).name }}</div>
+            <div class="text-lg font-semibold leading-snug text-ink">{{ (data as Tournament).name }}</div>
           </template>
         </Column>
         <Column
           header="Actions"
           style="width: 8rem"
-          headerClass="!bg-slate-800/95 !text-slate-200 !border-slate-700/50"
+          headerClass="!bg-tone-800/95 !text-tone-200 !border-tone-700/50"
         >
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">

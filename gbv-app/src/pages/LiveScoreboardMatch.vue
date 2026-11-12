@@ -699,7 +699,7 @@ onBeforeUnmount(async () => {
               :on-click="backToMatchActions"
               aria-label="Back to Match"
             />
-            <h2 class="text-2xl font-semibold text-white truncate">Enter Live Score</h2>
+            <h2 class="text-2xl font-semibold text-ink truncate">Enter Live Score</h2>
           </div>
           <div
             v-if="isLive"
@@ -712,16 +712,16 @@ onBeforeUnmount(async () => {
         </div>
 
         <div class="mt-1">
-          <div class="text-sm text-white/80">
+          <div class="text-sm text-ink/80">
             {{ matchType === 'bracket' ? 'Bracket' : matchType === 'pool' ? 'Pool' : 'Match' }} • Round {{ roundNumber ?? '—' }}
           </div>
           <div class="mt-2">
-            <div class="text-xl font-semibold text-white leading-tight">{{ nameFor(team1Id) }}</div>
-            <div class="text-sm font-medium text-white/70 leading-tight">vs</div>
-            <div class="text-xl font-semibold text-white leading-tight">{{ nameFor(team2Id) }}</div>
+            <div class="text-xl font-semibold text-ink leading-tight">{{ nameFor(team1Id) }}</div>
+            <div class="text-sm font-medium text-ink/70 leading-tight">vs</div>
+            <div class="text-xl font-semibold text-ink leading-tight">{{ nameFor(team2Id) }}</div>
           </div>
         </div>
-        <p v-if="pausedForInactivity" class="mt-1 text-sm text-white/80">
+        <p v-if="pausedForInactivity" class="mt-1 text-sm text-ink/80">
           Live scoring paused due to inactivity.
         </p>
         <p v-else-if="!canControl && isLive" class="mt-1 text-sm text-red-200">
@@ -746,9 +746,9 @@ onBeforeUnmount(async () => {
                   :disabled="!canControl"
                   @click="inc(1)"
                 >
-                  <div class="text-sm font-semibold text-white/90 truncate w-full">{{ nameFor(team1Id) }}</div>
+                  <div class="text-sm font-semibold text-ink/90 truncate w-full">{{ nameFor(team1Id) }}</div>
                   <div class="mt-2 text-7xl sm:text-8xl font-black tabular-nums">{{ score1 }}</div>
-                  <div class="mt-2 text-base font-semibold text-white/90">+1</div>
+                  <div class="mt-2 text-base font-semibold text-ink/90">+1</div>
                 </button>
                 <button
                   class="w-full rounded-2xl bg-white/10 ring-1 ring-white/20 py-3 text-base font-semibold text-white"
@@ -767,9 +767,9 @@ onBeforeUnmount(async () => {
                   :disabled="!canControl"
                   @click="inc(2)"
                 >
-                  <div class="text-sm font-semibold text-white/90 truncate w-full">{{ nameFor(team2Id) }}</div>
+                  <div class="text-sm font-semibold text-ink/90 truncate w-full">{{ nameFor(team2Id) }}</div>
                   <div class="mt-2 text-7xl sm:text-8xl font-black tabular-nums">{{ score2 }}</div>
-                  <div class="mt-2 text-base font-semibold text-white/90">+1</div>
+                  <div class="mt-2 text-base font-semibold text-ink/90">+1</div>
                 </button>
                 <button
                   class="w-full rounded-2xl bg-white/10 ring-1 ring-white/20 py-3 text-base font-semibold text-white"
@@ -813,7 +813,7 @@ onBeforeUnmount(async () => {
             </div>
           </div>
 
-          <div class="rounded-xl border border-dashed border-white/30 p-6 text-center text-white/80">
+          <div class="rounded-xl border border-dashed border-ink/30 p-6 text-center text-ink/80">
             This view updates in real-time for this match.
           </div>
         </div>
