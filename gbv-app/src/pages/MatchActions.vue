@@ -27,6 +27,10 @@ type Match = {
   live_owner_id: UUID | null;
   live_last_active_at: string | null;
   match_type: 'pool' | 'bracket';
+  best_of: number | null;
+  set_targets: number[] | null;
+  set_scores: Array<{ t1: number; t2: number }> | null;
+  court: string | null;
 };
 
 type Team = { id: UUID; full_team_name: string };
@@ -102,7 +106,7 @@ async function loadMatch() {
   }
   const { data, error } = await supabase
     .from('matches')
-    .select('id,tournament_id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type')
+    .select('id,tournament_id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,best_of,set_targets,set_scores,court')
     .eq('id', matchId.value)
     .eq('tournament_id', session.tournament.id)
     .single();
@@ -158,6 +162,9 @@ function winnerName(m: Match): string | null {
 
 function finalScoreText(m: Match): string | null {
   if (!isCompleted(m)) return null;
+  if ((m.best_of ?? 1) > 1 && Array.isArray(m.set_scores) && m.set_scores.length) {
+    return m.set_scores.map((x) => `${x.t1}\u2013${x.t2}`).join(', ');
+  }
   return `${m.team1_score ?? 0}\u2013${m.team2_score ?? 0}`;
 }
 
@@ -274,7 +281,7 @@ onBeforeUnmount(() => {
 
         <div
           v-if="isLiveActive(match)"
-          class="mt-5 rounded-2xl bg-white/10 p-4 text-white ring-2 ring-red-500/60"
+          class="mt-5 rounded-2xl bg-ink/10 p-4 text-ink ring-2 ring-red-500/60"
         >
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">Live Score</div>
@@ -284,11 +291,11 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="mt-3 grid grid-cols-2 gap-3">
-            <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
+            <div class="rounded-xl bg-ink/5 ring-1 ring-ink/15 p-3">
               <div class="text-xs font-medium text-ink/70 truncate">{{ nameFor(match.team1_id) }}</div>
               <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.live_score_team1 ?? 0 }}</div>
             </div>
-            <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
+            <div class="rounded-xl bg-ink/5 ring-1 ring-ink/15 p-3">
               <div class="text-xs font-medium text-ink/70 truncate">{{ nameFor(match.team2_id) }}</div>
               <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.live_score_team2 ?? 0 }}</div>
             </div>
@@ -297,16 +304,16 @@ onBeforeUnmount(() => {
 
         <div
           v-else-if="isCompleted(match)"
-          class="mt-5 rounded-2xl bg-white/10 p-4 text-white ring-1 ring-white/20"
+          class="mt-5 rounded-2xl bg-ink/10 p-4 text-ink ring-1 ring-ink/20"
         >
           <div class="flex items-center justify-between gap-3">
-            <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">Final</div>
-            <div class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide bg-white/10 ring-1 ring-white/20 text-white whitespace-nowrap">
+            <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">{{ (match.best_of ?? 1) > 1 ? 'Final · sets won' : 'Final' }}</div>
+            <div class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide bg-ink/10 ring-1 ring-ink/20 text-ink whitespace-nowrap">
               <span class="tabular-nums">{{ finalScoreText(match) }}</span>
             </div>
           </div>
           <div class="mt-3 grid grid-cols-2 gap-3">
-            <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
+            <div class="rounded-xl bg-ink/5 ring-1 ring-ink/15 p-3">
               <div
                 class="text-xs font-medium text-ink/70 truncate"
                 :class="winnerSide(match) === 2 ? 'opacity-70 line-through decoration-2 decoration-ink/70' : ''"
@@ -315,7 +322,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="mt-1 text-4xl font-black tabular-nums text-ink">{{ match.team1_score ?? 0 }}</div>
             </div>
-            <div class="rounded-xl bg-white/5 ring-1 ring-white/15 p-3">
+            <div class="rounded-xl bg-ink/5 ring-1 ring-ink/15 p-3">
               <div
                 class="text-xs font-medium text-ink/70 truncate"
                 :class="winnerSide(match) === 1 ? 'opacity-70 line-through decoration-2 decoration-ink/70' : ''"
@@ -344,7 +351,7 @@ onBeforeUnmount(() => {
             :disabled="!canEditScore"
             severity="secondary"
             size="large"
-            class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-white bg-white/10 ring-1 ring-white/20"
+            class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
             @click="goManual"
           />
           <Button
@@ -353,7 +360,7 @@ onBeforeUnmount(() => {
             :disabled="!canEditScore"
             severity="secondary"
             size="large"
-            class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-white bg-white/10 ring-1 ring-white/20"
+            class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
             @click="goLive"
           />
         </div>

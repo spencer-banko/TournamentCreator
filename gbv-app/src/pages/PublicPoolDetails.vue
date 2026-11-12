@@ -6,6 +6,12 @@ import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
 import PublicLayout from '../components/layout/PublicLayout.vue';
 import UiBackButton from '../components/ui/UiBackButton.vue';
+import { rankPool, DEFAULT_TIEBREAKERS, type Standing } from '../lib/standings';
+import { loadBrackets } from '../lib/bracket';
+import { poolFormatForSize } from '../lib/schedule';
+import { formatLabel } from '../lib/scoring';
+import { medalFor } from '../lib/bracketStyle';
+import type { Bracket, SetScore } from '../types/db';
 
 type UUID = string;
 
@@ -20,6 +26,8 @@ type Team = {
   id: UUID;
   full_team_name: string;
   seed_in_pool: number | null;
+  seed_global: number | null;
+  pool_id: UUID | null;
 };
 
 type Match = {
@@ -38,6 +46,9 @@ type Match = {
   live_owner_id: UUID | null;
   live_last_active_at: string | null;
   match_type: 'pool' | 'bracket';
+  best_of: number | null;
+  set_targets: number[] | null;
+  set_scores: SetScore[] | null;
 };
 
 const route = useRoute();
@@ -67,36 +78,17 @@ function isLiveActive(m: Match): boolean {
   return (now.value - t) <= LIVE_LEASE_MS;
 }
 
-type Standing = {
-  teamId: UUID;
-  name: string;
-  wins: number;
-  losses: number;
-  played: number;
-  setWon: number;
-  setLost: number;
-  setRatio: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  pointDiff: number;
-  seed: number | null;
-};
-
 const standings = ref<Standing[]>([]);
 
-const advanceCount = computed<number | null>(() => {
-  const size = teams.value.length;
-  if (!Number.isFinite(size) || size <= 0) return null;
-
-  const rules = session.tournament?.advancement_rules ?? null;
-  const configured = rules?.pools?.find((p) => p.fromPoolSize === size)?.advanceCount ?? null;
-  if (configured != null && Number.isFinite(configured) && configured > 0) return configured;
-
-  // Defaults (kept consistent with bracket.ts)
-  if (size === 4) return 2;
-  if (size === 5) return 3;
-  return null;
-});
+const brackets = ref<Bracket[]>([]);
+/** Which bracket a pool finishing place feeds, e.g. place 1 -> Gold. */
+function bracketForPlace(place: number): { name: string; dot: string } | null {
+  const i = brackets.value.findIndex((b) => (b.places ?? []).includes(place));
+  if (i < 0) return null;
+  const b = brackets.value[i];
+  return { name: b.name, dot: medalFor(b.name, i).dot };
+}
+const poolFormat = computed(() => formatLabel(poolFormatForSize(session.tournament?.game_rules, teams.value.length)));
 
 async function ensureTournament() {
   if (!accessCode.value) return;
@@ -137,7 +129,7 @@ async function loadTeams() {
   }
   const { data, error } = await supabase
     .from('teams')
-    .select('id, full_team_name, seed_in_pool')
+    .select('id, full_team_name, seed_in_pool, seed_global, pool_id')
     .eq('tournament_id', session.tournament.id)
     .eq('pool_id', poolId.value);
 
@@ -161,7 +153,7 @@ async function loadMatches() {
   }
   const { data, error } = await supabase
     .from('matches')
-    .select('id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type')
+    .select('id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,best_of,set_targets,set_scores')
     .eq('tournament_id', session.tournament.id)
     .eq('match_type', 'pool')
     .eq('pool_id', poolId.value)
@@ -193,119 +185,7 @@ async function loadMatches() {
 }
 
 function computeStandings() {
-  // Initialize map
-  const base: Record<string, Standing> = {};
-  for (const t of teams.value) {
-    base[t.id] = {
-      teamId: t.id,
-      name: t.full_team_name,
-      wins: 0,
-      losses: 0,
-      played: 0,
-      setWon: 0,
-      setLost: 0,
-      setRatio: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      pointDiff: 0,
-      seed: t.seed_in_pool ?? null,
-    };
-  }
-
-  // Aggregate from completed matches (scores not null)
-  for (const m of matches.value) {
-    const completed = m.team1_score != null && m.team2_score != null;
-    if (!completed) continue;
-    const t1 = m.team1_id;
-    const t2 = m.team2_id;
-    if (!t1 || !t2) continue;
-
-    const s1 = m.team1_score ?? 0;
-    const s2 = m.team2_score ?? 0;
-
-    // Determine outcome by scores; fallback to winner_id if needed
-    const t1Won = s1 > s2 || (s1 === s2 ? m.winner_id === t1 : false);
-    const t2Won = s2 > s1 || (s1 === s2 ? m.winner_id === t2 : false);
-
-    if (base[t1]) {
-      base[t1].played += 1;
-      base[t1].pointsFor += s1;
-      base[t1].pointsAgainst += s2;
-      base[t1].pointDiff += (s1 - s2);
-      if (t1Won) {
-        base[t1].wins += 1;
-        base[t1].setWon += 1;
-      } else if (t2Won) {
-        base[t1].losses += 1;
-        base[t1].setLost += 1;
-      }
-    }
-    if (base[t2]) {
-      base[t2].played += 1;
-      base[t2].pointsFor += s2;
-      base[t2].pointsAgainst += s1;
-      base[t2].pointDiff += (s2 - s1);
-      if (t2Won) {
-        base[t2].wins += 1;
-        base[t2].setWon += 1;
-      } else if (t1Won) {
-        base[t2].losses += 1;
-        base[t2].setLost += 1;
-      }
-    }
-  }
-
-  // Set ratios
-  for (const id of Object.keys(base)) {
-    const st = base[id];
-    const setsTotal = st.setWon + st.setLost;
-    st.setRatio = setsTotal > 0 ? st.setWon / setsTotal : 0;
-  }
-
-  // Helper: head-to-head comparison for exactly two-team ties
-  function headToHead(aId: string, bId: string): number {
-    // find their direct match if completed
-    const direct = matches.value.find((m) => {
-      const pair = new Set([m.team1_id, m.team2_id]);
-      return pair.has(aId) && pair.has(bId) && m.team1_score != null && m.team2_score != null;
-    });
-    if (!direct) return 0;
-    if (direct.winner_id === aId) return -1; // a above b
-    if (direct.winner_id === bId) return 1;  // b above a
-    return 0;
-  }
-
-  const arr = Object.values(base);
-
-  arr.sort((a, b) => {
-    // 1) wins desc
-    if (b.wins !== a.wins) return b.wins - a.wins;
-
-    // 2) point diff desc (primary tiebreaker for equal records)
-    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-
-    // 3) head-to-head if exactly two-way tie
-    const tiedSameWins = arr.filter((x) => x.wins === a.wins);
-    if (tiedSameWins.length >= 2) {
-      // if only a and b in this tie group, use head-to-head
-      const groupAB = tiedSameWins.filter((x) => x.teamId === a.teamId || x.teamId === b.teamId);
-      if (groupAB.length === 2) {
-        const h2h = headToHead(a.teamId, b.teamId);
-        if (h2h !== 0) return h2h;
-      }
-    }
-
-    // 4) set ratio desc
-    if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
-
-    // 5) seed asc if both available (earlier seed better)
-    if (a.seed != null && b.seed != null && a.seed !== b.seed) return a.seed - b.seed;
-
-    // 6) name asc as final fallback
-    return a.name.localeCompare(b.name);
-  });
-
-  standings.value = arr;
+  standings.value = rankPool(teams.value, matches.value, session.tournament?.advancement_rules?.tiebreakers ?? DEFAULT_TIEBREAKERS);
 }
 
 function nameFor(id: string | null) {
@@ -336,6 +216,9 @@ function winnerPillText(m: Match, side: 1 | 2): string {
   const s2 = m.team2_score ?? 0;
   const a = side === 1 ? s1 : s2;
   const b = side === 1 ? s2 : s1;
+  if ((m.best_of ?? 1) > 1 && Array.isArray(m.set_scores) && m.set_scores.length) {
+    return `WIN ${a}\u2013${b} \u00b7 ${m.set_scores.map((x) => (side === 1 ? `${x.t1}-${x.t2}` : `${x.t2}-${x.t1}`)).join(', ')}`;
+  }
   return `WIN ${a}\u2013${b}`;
 }
 
@@ -387,6 +270,11 @@ onMounted(async () => {
     await loadTeams();
     await loadMatches();
     computeStandings();
+    try {
+      if (session.tournament) brackets.value = await loadBrackets(session.tournament.id);
+    } catch {
+      brackets.value = [];
+    }
     await subscribeRealtime();
     refreshTimer = setInterval(() => {
       void loadMatches().then(() => computeStandings());
@@ -445,9 +333,8 @@ onBeforeUnmount(async () => {
         <!-- Standings -->
         <div class="mt-6">
           <h3 class="text-lg font-semibold text-ink">Standings</h3>
-          <div v-if="advanceCount != null" class="mt-1 text-sm text-tone-400">
-            Top <span class="font-semibold text-ink">{{ advanceCount }}</span> of
-            <span class="font-semibold text-ink">{{ teams.length }}</span> teams advance to bracket play.
+          <div class="mt-1 text-sm text-tone-400">
+            {{ poolFormat }} · ranked by wins, then point differential
           </div>
           <div v-if="standings.length === 0" class="mt-2 text-sm text-tone-400">No results yet.</div>
           <ul v-else class="mt-3 grid gap-3">
@@ -470,15 +357,18 @@ onBeforeUnmount(async () => {
                         {{ s.name }}
                       </div>
                     </div>
-                    <div class="shrink-0 text-sm tabular-nums text-tone-300">
-                      {{ s.wins }}-{{ s.losses }}
+                    <div class="shrink-0 text-sm font-semibold tabular-nums text-ink">
+                      {{ s.matchWins }}-{{ s.matchLosses }}
                     </div>
                   </div>
 
                   <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tone-500">
-                    <span>Seed: {{ s.seed ?? '—' }}</span>
-                    <span>Set Ratio: {{ (s.setRatio * 100).toFixed(0) }}%</span>
-                    <span>Pt Diff: {{ s.pointDiff > 0 ? '+' + s.pointDiff : s.pointDiff }}</span>
+                    <span v-if="bracketForPlace(i + 1)" class="inline-flex items-center gap-1 font-semibold text-tone-300">
+                      <span class="h-2 w-2 rounded-full" :style="{ background: bracketForPlace(i + 1)!.dot }" />{{ bracketForPlace(i + 1)!.name }}
+                    </span>
+                    <span>Sets {{ s.gameWins }}-{{ s.gameLosses }}</span>
+                    <span>Pt Diff {{ s.pointDiff > 0 ? '+' + s.pointDiff : s.pointDiff }}</span>
+                    <span>Seed {{ s.seed ?? '—' }}</span>
                   </div>
                 </div>
               </div>

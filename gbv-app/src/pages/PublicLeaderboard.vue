@@ -6,6 +6,10 @@ import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
 import PublicLayout from '../components/layout/PublicLayout.vue';
 import UiBackButton from '../components/ui/UiBackButton.vue';
+import { rankAllPools, seedForPlaces, DEFAULT_TIEBREAKERS, type Standing } from '../lib/standings';
+import { loadBrackets } from '../lib/bracket';
+import { medalFor, placesLabel } from '../lib/bracketStyle';
+import type { Bracket, SetScore } from '../types/db';
 
 type UUID = string;
 
@@ -13,6 +17,8 @@ type Team = {
   id: UUID;
   full_team_name: string;
   seed_global: number | null;
+  seed_in_pool: number | null;
+  pool_id: UUID | null;
 };
 
 type Match = {
@@ -26,21 +32,8 @@ type Match = {
   team2_score: number | null;
   winner_id: UUID | null;
   match_type: 'pool' | 'bracket';
-};
-
-type Standing = {
-  teamId: UUID;
-  name: string;
-  wins: number;
-  losses: number;
-  played: number;
-  setWon: number;
-  setLost: number;
-  setRatio: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  pointDiff: number;
-  seed: number | null;
+  best_of: number | null;
+  set_scores: SetScore[] | null;
 };
 
 const route = useRoute();
@@ -53,6 +46,10 @@ const loading = ref(false);
 const teams = ref<Team[]>([]);
 const matches = ref<Match[]>([]);
 const standings = ref<Standing[]>([]);
+const brackets = ref<Bracket[]>([]);
+const poolNames = ref<Record<string, string>>({});
+type Group = { key: string; title: string; subtitle: string; dot: string | null; rows: Standing[] };
+const groups = ref<Group[]>([]);
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -75,7 +72,7 @@ async function loadTeams() {
   }
   const { data, error } = await supabase
     .from('teams')
-    .select('id, full_team_name, seed_global')
+    .select('id, full_team_name, seed_global, seed_in_pool, pool_id')
     .eq('tournament_id', session.tournament.id);
 
   if (error) {
@@ -107,7 +104,7 @@ async function loadMatches() {
 
   const { data, error } = await supabase
     .from('matches')
-    .select('id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,match_type')
+    .select('id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,match_type,best_of,set_scores')
     .eq('tournament_id', session.tournament.id)
     .eq('match_type', 'pool')
     .order('pool_id', { ascending: true })
@@ -123,81 +120,27 @@ async function loadMatches() {
   matches.value = dedupePoolMatches(((data as Match[]) ?? []));
 }
 
+/**
+ * Group teams the way brackets are seeded: each bracket (Gold, Silver, ...) lists the teams whose
+ * pool finish feeds it, in seed order (game wins, then point differential).
+ */
 function computeStandings() {
-  const base: Record<string, Standing> = {};
-  for (const t of teams.value) {
-    base[t.id] = {
-      teamId: t.id,
-      name: t.full_team_name,
-      wins: 0,
-      losses: 0,
-      played: 0,
-      setWon: 0,
-      setLost: 0,
-      setRatio: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      pointDiff: 0,
-      seed: t.seed_global ?? null,
-    };
-  }
-
-  for (const m of matches.value) {
-    const completed = m.team1_score != null && m.team2_score != null;
-    if (!completed) continue;
-    const t1 = m.team1_id;
-    const t2 = m.team2_id;
-    if (!t1 || !t2) continue;
-
-    const s1 = m.team1_score ?? 0;
-    const s2 = m.team2_score ?? 0;
-    const t1Won = s1 > s2 || (s1 === s2 ? m.winner_id === t1 : false);
-    const t2Won = s2 > s1 || (s1 === s2 ? m.winner_id === t2 : false);
-
-    if (base[t1]) {
-      base[t1].played += 1;
-      base[t1].pointsFor += s1;
-      base[t1].pointsAgainst += s2;
-      base[t1].pointDiff += (s1 - s2);
-      if (t1Won) {
-        base[t1].wins += 1;
-        base[t1].setWon += 1;
-      } else if (t2Won) {
-        base[t1].losses += 1;
-        base[t1].setLost += 1;
-      }
-    }
-    if (base[t2]) {
-      base[t2].played += 1;
-      base[t2].pointsFor += s2;
-      base[t2].pointsAgainst += s1;
-      base[t2].pointDiff += (s2 - s1);
-      if (t2Won) {
-        base[t2].wins += 1;
-        base[t2].setWon += 1;
-      } else if (t1Won) {
-        base[t2].losses += 1;
-        base[t2].setLost += 1;
-      }
-    }
-  }
-
-  for (const id of Object.keys(base)) {
-    const st = base[id];
-    const setsTotal = st.setWon + st.setLost;
-    st.setRatio = setsTotal > 0 ? st.setWon / setsTotal : 0;
-  }
-
-  const arr = Object.values(base);
-  arr.sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-    if (b.setRatio !== a.setRatio) return b.setRatio - a.setRatio;
-    if (a.seed != null && b.seed != null && a.seed !== b.seed) return a.seed - b.seed;
-    return a.name.localeCompare(b.name);
+  const byPool = rankAllPools(teams.value, matches.value, session.tournament?.advancement_rules?.tiebreakers ?? DEFAULT_TIEBREAKERS);
+  const all = [...byPool.values()].flat();
+  standings.value = all;
+  const out: Group[] = [];
+  const used = new Set<string>();
+  brackets.value.forEach((b, i) => {
+    const rows = seedForPlaces(byPool, b.places ?? []);
+    rows.forEach((r) => used.add(r.teamId));
+    if (rows.length) out.push({ key: b.id, title: b.name, subtitle: placesLabel(b.places ?? []), dot: medalFor(b.name, i).dot, rows });
   });
-
-  standings.value = arr;
+  const rest = all.filter((r) => !used.has(r.teamId));
+  if (rest.length) {
+    const sorted = seedForPlaces(new Map([['_', rest]]), [...new Set(rest.map((r) => r.place))]);
+    out.push({ key: 'rest', title: out.length ? 'Not in a bracket' : 'All teams', subtitle: '', dot: null, rows: sorted });
+  }
+  groups.value = out;
 }
 
 async function subscribeRealtime() {
@@ -229,6 +172,15 @@ onMounted(async () => {
     await ensureTournament();
     await loadTeams();
     await loadMatches();
+    if (session.tournament) {
+      try {
+        brackets.value = await loadBrackets(session.tournament.id);
+      } catch {
+        brackets.value = [];
+      }
+      const { data } = await supabase.from('pools').select('id,name').eq('tournament_id', session.tournament.id);
+      poolNames.value = Object.fromEntries(((data as Array<{ id: string; name: string }>) ?? []).map((p) => [p.id, p.name]));
+    }
     computeStandings();
     await subscribeRealtime();
     refreshTimer = setInterval(() => {
@@ -262,52 +214,47 @@ onBeforeUnmount(async () => {
             aria-label="Return to Tournament"
           />
           <div class="min-w-0">
-            <h2 class="text-2xl font-semibold text-ink">Global Leaderboard</h2>
+            <h2 class="text-2xl font-semibold text-ink">Leaderboard</h2>
             <p class="mt-1 text-ink/80">
-              Tournament-wide pool play standings.
+              Pool play results, grouped by the bracket each team plays in.
             </p>
           </div>
         </div>
         <div v-if="loading" class="text-sm text-ink/80 shrink-0">Loading…</div>
       </div>
 
-      <div class="mt-6">
-        <div v-if="standings.length === 0" class="text-sm text-ink/80">No results yet.</div>
-        <ul v-else class="mt-3 grid gap-3">
+      <div v-if="standings.length === 0" class="mt-6 text-sm text-ink/80">No results yet.</div>
+      <div v-for="g in groups" :key="g.key" class="mt-6">
+        <div class="flex items-baseline justify-between gap-3">
+          <h3 class="flex items-center gap-2 text-lg font-bold text-ink">
+            <span v-if="g.dot" class="h-3 w-3 rounded-full" :style="{ background: g.dot }" />
+            {{ g.title }}
+          </h3>
+          <span class="text-xs text-ink/60">{{ g.subtitle }}<template v-if="g.subtitle"> · </template>{{ g.rows.length }} teams</span>
+        </div>
+        <ol class="mt-2 overflow-hidden rounded-2xl ring-1 ring-ink/15">
           <li
-            v-for="(s, i) in standings"
+            v-for="(s, i) in g.rows"
             :key="s.teamId"
-            class="rounded-xl bg-white/10 ring-1 ring-white/20 p-4 text-white"
+            class="flex items-center gap-3 border-t border-ink/10 px-3 py-2.5 first:border-t-0"
           >
-            <div class="flex items-start gap-3">
-              <div
-                class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 text-sm font-semibold text-white/90 tabular-nums"
-              >
-                {{ i + 1 }}
-              </div>
-
-              <div class="min-w-0 flex-1">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0 flex-1">
-                    <div class="font-semibold text-ink leading-tight">
-                      {{ s.name }}
-                    </div>
-                  </div>
-                  <div class="shrink-0 text-sm text-ink/80 tabular-nums">
-                    {{ s.wins }}-{{ s.losses }}
-                  </div>
-                </div>
-
-                <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/70">
-                  <span>Global Seed: {{ s.seed ?? '—' }}</span>
-                  <span>Set Ratio: {{ (s.setRatio * 100).toFixed(0) }}%</span>
-                  <span>Pt Diff: {{ s.pointDiff > 0 ? '+' + s.pointDiff : s.pointDiff }}</span>
-                </div>
-              </div>
-            </div>
+            <span class="w-6 shrink-0 text-right text-sm font-semibold tabular-nums text-ink/60">{{ i + 1 }}</span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate font-semibold leading-tight text-ink">{{ s.name }}</span>
+              <span class="block text-xs text-ink/60">
+                {{ s.poolId ? poolNames[s.poolId] ?? 'Pool' : 'Pool' }} · {{ s.place }}{{ s.place === 1 ? 'st' : s.place === 2 ? 'nd' : s.place === 3 ? 'rd' : 'th' }}
+              </span>
+            </span>
+            <span class="shrink-0 text-right tabular-nums">
+              <span class="block text-sm font-semibold text-ink">{{ s.gameWins }}–{{ s.gameLosses }}</span>
+              <span class="block text-xs" :class="s.pointDiff > 0 ? 'text-emerald-400' : s.pointDiff < 0 ? 'text-red-400' : 'text-ink/60'">
+                {{ s.pointDiff > 0 ? '+' : '' }}{{ s.pointDiff }}
+              </span>
+            </span>
           </li>
-        </ul>
+        </ol>
       </div>
+      <p v-if="groups.length" class="mt-4 text-xs text-ink/60">Within each bracket, teams are ordered by games won, then point differential. This is the bracket seeding order.</p>
     </section>
   </PublicLayout>
 </template>

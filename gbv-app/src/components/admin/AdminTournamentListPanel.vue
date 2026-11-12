@@ -155,7 +155,7 @@ defineExpose({ loadTournaments, getTournaments });
           class:
             variant === 'dashboard' || variant === 'setup'
               ? 'bg-tone-800/95 text-tone-200'
-              : 'bg-white/10 text-white',
+              : 'bg-ink/10 text-ink',
         },
         tbody: {
           class: variant === 'dashboard' || variant === 'setup' ? 'text-tone-200' : 'text-ink/90',

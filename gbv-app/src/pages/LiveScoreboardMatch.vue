@@ -737,7 +737,7 @@ onBeforeUnmount(async () => {
         </div>
 
         <div class="mt-6 grid grid-cols-1 gap-6">
-          <div class="rounded-xl bg-white/10 ring-1 ring-white/20 p-4 sm:p-6">
+          <div class="rounded-xl bg-ink/10 ring-1 ring-ink/20 p-4 sm:p-6">
             <div class="grid grid-cols-2 gap-3 sm:gap-4">
               <div class="flex flex-col gap-2">
                 <button
@@ -751,8 +751,8 @@ onBeforeUnmount(async () => {
                   <div class="mt-2 text-base font-semibold text-ink/90">+1</div>
                 </button>
                 <button
-                  class="w-full rounded-2xl bg-white/10 ring-1 ring-white/20 py-3 text-base font-semibold text-white"
-                  :class="!canControl ? 'opacity-60 cursor-not-allowed' : 'hover:bg-white/15 active:scale-[0.99]'"
+                  class="w-full rounded-2xl bg-ink/10 ring-1 ring-ink/20 py-3 text-base font-semibold text-ink"
+                  :class="!canControl ? 'opacity-60 cursor-not-allowed' : 'hover:bg-ink/15 active:scale-[0.99]'"
                   :disabled="!canControl"
                   @click="dec(1)"
                 >
@@ -772,8 +772,8 @@ onBeforeUnmount(async () => {
                   <div class="mt-2 text-base font-semibold text-ink/90">+1</div>
                 </button>
                 <button
-                  class="w-full rounded-2xl bg-white/10 ring-1 ring-white/20 py-3 text-base font-semibold text-white"
-                  :class="!canControl ? 'opacity-60 cursor-not-allowed' : 'hover:bg-white/15 active:scale-[0.99]'"
+                  class="w-full rounded-2xl bg-ink/10 ring-1 ring-ink/20 py-3 text-base font-semibold text-ink"
+                  :class="!canControl ? 'opacity-60 cursor-not-allowed' : 'hover:bg-ink/15 active:scale-[0.99]'"
                   :disabled="!canControl"
                   @click="dec(2)"
                 >
@@ -821,7 +821,7 @@ onBeforeUnmount(async () => {
         <div class="mt-6 flex justify-center">
           <router-link
             :to="{ name: 'match-score', params: { accessCode: accessCode, matchId: matchId }, query: from ? { from } : undefined }"
-            class="inline-flex items-center rounded-2xl bg-white/10 ring-1 ring-white/20 px-4 py-2 text-sm hover:bg-white/15 text-white"
+            class="inline-flex items-center rounded-2xl bg-ink/10 ring-1 ring-ink/20 px-4 py-2 text-sm hover:bg-ink/15 text-ink"
           >
             Enter Final Score
           </router-link>

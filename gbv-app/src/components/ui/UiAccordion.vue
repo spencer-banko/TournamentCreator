@@ -29,7 +29,7 @@ function toggle() {
 </script>
 
 <template>
-  <div class="w-full rounded-lg border border-white/15 bg-white/5">
+  <div class="w-full rounded-lg border border-ink/15 bg-ink/5">
     <div
       class="flex items-stretch justify-between gap-2 sm:gap-3"
       :class="[disabled ? 'opacity-60' : '']"
@@ -37,7 +37,7 @@ function toggle() {
       <button
         type="button"
         class="min-w-0 flex-1 px-4 py-3 text-left"
-        :class="[disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-white/5']"
+        :class="[disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-ink/5']"
         @click="toggle"
         :aria-expanded="isOpen"
         :disabled="disabled"
@@ -53,7 +53,7 @@ function toggle() {
         <slot name="actions" />
         <button
           type="button"
-          class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/50 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink/80 transition-colors hover:bg-ink/10 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/50 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="disabled"
           :aria-expanded="isOpen"
           aria-label="Expand or collapse section"

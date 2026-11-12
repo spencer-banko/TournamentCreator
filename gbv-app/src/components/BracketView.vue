@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import { roundName } from '../lib/standings';
 
 type UUID = string;
 
@@ -16,6 +17,9 @@ export interface BracketMatch {
   live_score_team1?: number | null;
   live_score_team2?: number | null;
   live_last_active_at?: string | null;
+  set_scores?: Array<{ t1: number; t2: number }> | null;
+  best_of?: number | null;
+  court?: string | null;
 }
 
 const props = withDefaults(
@@ -35,6 +39,8 @@ const props = withDefaults(
 	    // When true, render an internal scroll container (overflow: auto).
 	    // When false, let the parent/page handle scrolling (enables full-page diagonal scroll).
 	    scroll?: boolean;
+	    /** Optional label per round number, e.g. { 3: 'Best of 3 (21, 21, 15)' }. */
+	    roundFormats?: Record<number, string>;
 	  }>(),
 	  { scroll: true }
 );
@@ -246,15 +252,14 @@ function winnerPillText(m: BracketMatch, side: 1 | 2): string {
   const s2 = m.team2_score ?? 0;
   const a = side === 1 ? s1 : s2;
   const b = side === 1 ? s2 : s1;
+  if ((m.best_of ?? 1) > 1 && Array.isArray(m.set_scores) && m.set_scores.length) {
+    return m.set_scores.map((x) => (side === 1 ? `${x.t1}-${x.t2}` : `${x.t2}-${x.t1}`)).join(' · ');
+  }
   return `WIN ${a}-${b}`;
 }
 
 function roundTitle(round: number): string {
-  const mr = roundsCount.value;
-  if (mr <= 1) return 'Final';
-  if (mr === 2) return round === 1 ? 'Semifinals' : 'Final';
-  if (mr === 3) return round === 1 ? 'Quarterfinals' : round === 2 ? 'Semifinals' : 'Final';
-  return `Round ${round}`;
+  return roundName(round, roundsCount.value);
 }
 
 const courtsSorted = computed(() => {
@@ -370,7 +375,7 @@ const metaByMatchId = computed<Record<string, DerivedMeta>>(() => {
 });
 
 function courtLabelFor(m: BracketMatch): string {
-  const court = metaByMatchId.value[m.id]?.court ?? null;
+  const court = (m.court ?? '').trim() || metaByMatchId.value[m.id]?.court || null;
   return court ? `Court ${court}` : 'Court TBD';
 }
 
@@ -410,6 +415,7 @@ function onOpen(m: BracketMatch) {
           }"
         >
           {{ roundTitle(r) }}
+          <span v-if="roundFormats?.[r]" class="col-format">{{ roundFormats[r] }}</span>
         </div>
       </div>
 
@@ -551,7 +557,7 @@ function onOpen(m: BracketMatch) {
 }
 
 .col-title {
-  color: rgba(255,255,255,0.8);
+  color: rgba(var(--ink-rgb), 0.8);
   font-size: 0.9rem;
   font-weight: 600;
   padding: 0 4px 10px 4px;
@@ -564,10 +570,10 @@ function onOpen(m: BracketMatch) {
 .match-tile {
   cursor: pointer;
   border-radius: 16px;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(var(--ink-rgb), 0.10);
+  border: 1px solid rgba(var(--ink-rgb), 0.18);
   padding: 4px 8px;
-  color: white;
+  color: var(--color-ink);
   transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out, transform 0.15s ease-in-out;
   backdrop-filter: blur(10px);
   display: flex;
@@ -577,9 +583,14 @@ function onOpen(m: BracketMatch) {
   z-index: 10;
 }
 
+:global(:root[data-theme='ecva']) .match-tile {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(var(--shadow-rgb), 0.08);
+}
+
 .match-tile:hover {
-  background: rgba(255,255,255,0.14);
-  border-color: rgba(255,255,255,0.28);
+  background: rgba(var(--ink-rgb), 0.14);
+  border-color: rgba(var(--ink-rgb), 0.28);
   transform: translateY(-1px);
 }
 
@@ -589,8 +600,8 @@ function onOpen(m: BracketMatch) {
 }
 
 .match-tile--disabled:hover {
-  background: rgba(255,255,255,0.10);
-  border-color: rgba(255,255,255,0.18);
+  background: rgba(var(--ink-rgb), 0.10);
+  border-color: rgba(var(--ink-rgb), 0.18);
   transform: none;
 }
 
@@ -649,7 +660,7 @@ function onOpen(m: BracketMatch) {
 .team-name--loser {
   text-decoration: line-through;
   text-decoration-thickness: 2px;
-  text-decoration-color: rgba(255,255,255,0.65);
+  text-decoration-color: rgba(var(--ink-rgb), 0.65);
 }
 
 .tile-subrow {
@@ -663,7 +674,7 @@ function onOpen(m: BracketMatch) {
   font-weight: 750;
   letter-spacing: 0.02em;
   text-transform: lowercase;
-  color: rgba(255,255,255,0.80);
+  color: rgba(var(--ink-rgb), 0.80);
   padding: 2px 6px;
 }
 
@@ -675,7 +686,7 @@ function onOpen(m: BracketMatch) {
   min-width: 0;
   font-size: 0.72rem;
   font-weight: 650;
-  color: rgba(255,255,255,0.72);
+  color: rgba(var(--ink-rgb), 0.72);
   padding: 1px 6px 2px 6px;
 }
 
@@ -694,7 +705,7 @@ function onOpen(m: BracketMatch) {
   gap: 6px;
   border-radius: 999px;
   background: rgba(220,38,38,0.92);
-  color: white;
+  color: #fff;
   padding: 2px 8px;
   font-size: 0.65rem;
   font-weight: 800;
@@ -721,7 +732,7 @@ function onOpen(m: BracketMatch) {
 }
 
 .pill-bye {
-  color: rgba(255,255,255,0.95);
+  color: #fff;
   background: rgba(59,130,246,0.92);
   border: 1px solid rgba(59,130,246,0.85);
 }
@@ -737,7 +748,7 @@ function onOpen(m: BracketMatch) {
 
 .connector {
   fill: none;
-  stroke: rgba(255,255,255,0.85);
+  stroke: rgba(var(--ink-rgb), 0.85);
   stroke-width: 2.0;
   stroke-linecap: round;
   stroke-linejoin: round;

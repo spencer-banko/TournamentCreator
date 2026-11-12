@@ -94,7 +94,8 @@ async function signIn(e: Event) {
                 :feedback="false"
                 toggleMask
                 class="w-full"
-                inputClass="!rounded-2xl !border !border-slate-300/90 !px-5 !py-4 !text-base !bg-white !shadow-lg !text-slate-900"
+                inputClass="!w-full !rounded-2xl !border !border-slate-300/90 !px-5 !py-4 !pr-12 !text-base !bg-white !shadow-lg !text-slate-900"
+                :pt="{ root: { class: '!w-full' }, pcInputText: { root: { class: '!w-full' } } }"
                 placeholder="••••••••"
                 required
               />

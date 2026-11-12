@@ -214,7 +214,7 @@ onBeforeUnmount(async () => {
         </p>
 
         <div class="mt-6 grid grid-cols-1 gap-6">
-          <div class="rounded-xl bg-white/10 ring-1 ring-white/20 p-6">
+          <div class="rounded-xl bg-ink/10 ring-1 ring-ink/20 p-6">
             <div class="grid grid-cols-2 items-center gap-6">
               <div class="text-center">
                 <div class="text-sm text-ink/80">Team 1</div>

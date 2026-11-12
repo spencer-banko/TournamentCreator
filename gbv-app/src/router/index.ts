@@ -117,6 +117,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAdmin: true, blueLayout: true },
   },
   {
+    path: '/admin/pool-matches',
+    name: 'admin-pool-matches',
+    component: () => import('../pages/AdminPoolMatches.vue'),
+    meta: { requiresAdmin: true, blueLayout: true },
+  },
+  {
     path: '/admin/bracket',
     name: 'admin-bracket',
     component: () => import('../pages/AdminBracket.vue'),

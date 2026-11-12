@@ -253,7 +253,7 @@ onMounted(async () => {
             severity="secondary"
             size="large"
             icon="pi pi-check-circle"
-            class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-white bg-white/10 ring-1 ring-white/20"
+            class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
             @click="submitScore"
           />
         </div>

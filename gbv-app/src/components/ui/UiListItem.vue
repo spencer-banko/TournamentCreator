@@ -30,7 +30,7 @@ const props = defineProps<Props>();
         ? 'opacity-60 cursor-not-allowed'
         : props.cohesive
           ? 'hover:bg-tone-800/55 hover:border-amber-500/15 cursor-pointer'
-          : 'hover:bg-white/5 cursor-pointer',
+          : 'hover:bg-ink/5 cursor-pointer',
     ]"
     role="button"
     :aria-disabled="props.disabled || undefined"
@@ -79,8 +79,8 @@ const props = defineProps<Props>();
             !props.cohesive && props.badgeSeverity === 'success' ? 'bg-green-500/20 text-green-300' : '',
             !props.cohesive && props.badgeSeverity === 'warn' ? 'bg-amber-500/20 text-amber-300' : '',
             !props.cohesive && props.badgeSeverity === 'danger' ? 'bg-red-500/20 text-red-300' : '',
-            !props.cohesive && props.badgeSeverity === 'info' ? 'bg-white/10 text-white/70' : '',
-            !props.cohesive && !props.badgeSeverity ? 'bg-white/10 text-white/70' : '',
+            !props.cohesive && props.badgeSeverity === 'info' ? 'bg-ink/10 text-ink/70' : '',
+            !props.cohesive && !props.badgeSeverity ? 'bg-ink/10 text-ink/70' : '',
           ]"
         >
           {{ props.badge }}

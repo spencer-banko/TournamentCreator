@@ -6,6 +6,10 @@ import { useToast } from 'primevue/usetoast';
 import supabase from '../lib/supabase';
 import PublicLayout from '../components/layout/PublicLayout.vue';
 import BracketView from '../components/BracketView.vue';
+import { loadBrackets } from '../lib/bracket';
+import { formatFromMatch } from '../lib/scoring';
+import { medalFor, placesLabel } from '../lib/bracketStyle';
+import type { Bracket, SetScore } from '../types/db';
 
 type UUID = string;
 
@@ -29,6 +33,11 @@ type Match = {
   match_type: 'pool' | 'bracket';
   bracket_round: number | null;
   bracket_match_index: number | null;
+  bracket_id: UUID | null;
+  best_of: number | null;
+  set_targets: number[] | null;
+  set_scores: SetScore[] | null;
+  court: string | null;
 };
 
 const route = useRoute();
@@ -49,7 +58,47 @@ function onBracketViewportScroll(pos: { left: number; top: number }) {
   bracketChromeHidden.value = pos.left > 0 || pos.top > 0;
 }
 
-const matches = ref<Match[]>([]);
+const allMatches = ref<Match[]>([]);
+const brackets = ref<Bracket[]>([]);
+const selectedId = ref<string | null>(null);
+
+/** Brackets that have matches; legacy matches without a bracket_id show under one tab. */
+const tabs = computed(() => {
+  const withMatches = brackets.value.filter((b) => allMatches.value.some((m) => m.bracket_id === b.id));
+  const orphan = allMatches.value.some((m) => !m.bracket_id || !brackets.value.some((b) => b.id === m.bracket_id));
+  const list = withMatches.map((b, i) => ({ id: b.id as string, name: b.name, places: b.places, medal: medalFor(b.name, i) }));
+  if (orphan) list.push({ id: '__legacy', name: list.length ? 'Other' : 'Bracket', places: [], medal: medalFor('', list.length) });
+  return list;
+});
+const selectedTab = computed(() => tabs.value.find((t) => t.id === selectedId.value) ?? tabs.value[0] ?? null);
+const matches = computed<Match[]>(() => {
+  const tab = selectedTab.value;
+  if (!tab) return [];
+  if (tab.id === '__legacy') return allMatches.value.filter((m) => !m.bracket_id || !brackets.value.some((b) => b.id === m.bracket_id));
+  return allMatches.value.filter((m) => m.bracket_id === tab.id);
+});
+const roundFormats = computed<Record<number, string>>(() => {
+  const out: Record<number, string> = {};
+  for (const m of matches.value) {
+    const r = m.bracket_round ?? 1;
+    if (out[r]) continue;
+    const f = formatFromMatch(m);
+    out[r] = f.bestOf > 1 ? `Best of 3 · ${f.setTargets.join(', ')}` : `1 set to ${f.setTargets[0]}`;
+  }
+  return out;
+});
+function selectTab(id: string) {
+  selectedId.value = id;
+  router.replace({ query: { ...route.query, b: tabs.value.find((t) => t.id === id)?.name ?? undefined } });
+}
+function championFor(list: Match[]): string | null {
+  if (!list.length) return null;
+  const maxRound = Math.max(0, ...list.map((m) => m.bracket_round ?? 0));
+  const f = list.find((m) => (m.bracket_round ?? 0) === maxRound && (m.bracket_match_index ?? 0) === 0);
+  if (!f || f.team1_score == null) return null;
+  const w = winnerIdFor(f);
+  return w ? teamNameById.value[w] ?? 'TBD' : null;
+}
 const teamNameById = ref<Record<string, string>>({});
 const courts = ref<string[]>([]);
 
@@ -69,16 +118,7 @@ function winnerIdFor(m: Match): string | null {
   return null;
 }
 
-const championName = computed(() => {
-  if (!matches.value.length) return null;
-  const maxRound = Math.max(0, ...matches.value.map((m) => m.bracket_round ?? 0));
-  if (!maxRound) return null;
-  const finalMatch = matches.value.find((m) => (m.bracket_round ?? 0) === maxRound && (m.bracket_match_index ?? 0) === 0) ?? null;
-  if (!finalMatch) return null;
-  const winId = winnerIdFor(finalMatch);
-  if (!winId) return null;
-  return teamNameById.value[winId] ?? 'TBD';
-});
+const championName = computed(() => championFor(matches.value));
 
 async function ensureTournament() {
   if (!accessCode.value) return;
@@ -108,12 +148,12 @@ async function loadTeams() {
 
 async function loadMatches() {
   if (!session.tournament) {
-    matches.value = [];
+    allMatches.value = [];
     return;
   }
   const { data, error } = await supabase
     .from('matches')
-    .select('id,tournament_id,pool_id,round_number,team1_id,team2_id,team1_score,team2_score,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,winner_id,match_type,bracket_round,bracket_match_index')
+    .select('id,tournament_id,pool_id,round_number,team1_id,team2_id,team1_score,team2_score,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,winner_id,match_type,bracket_round,bracket_match_index,bracket_id,best_of,set_targets,set_scores,court')
     .eq('tournament_id', session.tournament.id)
     .eq('match_type', 'bracket')
     .order('bracket_round', { ascending: true })
@@ -121,10 +161,10 @@ async function loadMatches() {
 
   if (error) {
     toast.add({ severity: 'error', summary: 'Failed to load bracket', detail: error.message, life: 3000 });
-    matches.value = [];
+    allMatches.value = [];
     return;
   }
-  matches.value = (data as Match[]) ?? [];
+  allMatches.value = (data as Match[]) ?? [];
 }
 
 async function loadCourts() {
@@ -162,7 +202,7 @@ function openMatch(m: Match) {
   router.push({ name: 'match-actions', params: { accessCode: accessCode.value, matchId: m.id } });
 }
 function openMatchById(id: string) {
-  const m = matches.value.find(mm => mm.id === id);
+  const m = allMatches.value.find(mm => mm.id === id);
   if (m) openMatch(m);
 }
 
@@ -205,7 +245,14 @@ onMounted(async () => {
       return;
     }
     await loadTeams();
+    try {
+      brackets.value = await loadBrackets(session.tournament!.id);
+    } catch {
+      brackets.value = [];
+    }
     await loadMatches();
+    const wanted = String(route.query.b ?? '').toLowerCase();
+    selectedId.value = tabs.value.find((t) => t.name.toLowerCase() === wanted)?.id ?? tabs.value[0]?.id ?? null;
     await loadCourts();
     await subscribeRealtime();
     refreshTimer = setInterval(() => void loadMatches(), 15_000);
@@ -232,31 +279,31 @@ onBeforeUnmount(async () => {
       class="px-5 sm:px-7 pb-2"
       :class="bracketChromeHidden ? 'pt-2 sm:pt-3' : 'pt-5 sm:pt-7'"
     >
-      <div v-show="!bracketChromeHidden" class="mb-4 flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 p-2">
+      <div v-show="!bracketChromeHidden" class="mb-4 flex items-center gap-2 rounded-xl border border-ink/20 bg-ink/5 p-2">
         <router-link
           :to="{ name: 'public-pool-list', params: { accessCode } }"
-          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-ink/85 transition-colors hover:bg-ink/10"
         >
           Pool Play
         </router-link>
         <router-link
           :to="{ name: 'public-bracket', params: { accessCode } }"
-          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold bg-amber-400/20 text-amber-100 ring-1 ring-amber-300/45"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold bg-amber-400/20 text-ink ring-1 ring-amber-400/60"
         >
           Bracket
         </router-link>
       </div>
       <div v-show="!bracketChromeHidden" class="flex items-center justify-between gap-3">
         <div>
-          <h2 class="text-2xl font-semibold text-ink">Bracket</h2>
+          <h2 class="text-2xl font-semibold text-ink">{{ tabs.length > 1 && selectedTab ? `${selectedTab.name} Bracket` : 'Bracket' }}</h2>
           <p class="mt-1 text-ink/80">
-            Playoff bracket. Tap a match to view actions.
+            <template v-if="selectedTab && selectedTab.places.length">{{ placesLabel(selectedTab.places) }} · </template>Tap a match for details or to enter a score.
           </p>
         </div>
         <div class="flex items-center gap-2">
           <router-link
             :to="{ name: 'public-leaderboard', params: { accessCode } }"
-            class="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-white/15 transition-colors whitespace-nowrap"
+            class="inline-flex items-center rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink ring-1 ring-ink/20 hover:bg-ink/15 transition-colors whitespace-nowrap"
           >
             Leaderboard
           </router-link>
@@ -264,12 +311,36 @@ onBeforeUnmount(async () => {
         </div>
       </div>
 
+      <nav
+        v-if="tabs.length > 1"
+        v-show="!bracketChromeHidden"
+        class="mt-4 flex gap-2 overflow-x-auto pb-1"
+        role="tablist"
+        aria-label="Brackets"
+      >
+        <button
+          v-for="t in tabs"
+          :key="t.id"
+          type="button"
+          role="tab"
+          :aria-selected="t.id === selectedTab?.id"
+          class="flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition"
+          :class="t.id === selectedTab?.id ? 'text-ink shadow-sm' : 'text-ink/70 ring-1 ring-ink/15 hover:bg-ink/5'"
+          :style="t.id === selectedTab?.id ? { background: t.medal.chip, boxShadow: `inset 0 0 0 2px ${t.medal.ring}` } : {}"
+          @click="selectTab(t.id)"
+        >
+          <span class="h-2.5 w-2.5 rounded-full" :style="{ background: t.medal.dot }" />
+          {{ t.name }}
+          <span v-if="championFor(allMatches.filter((m) => (t.id === '__legacy' ? !m.bracket_id : m.bracket_id === t.id)))" class="text-xs" aria-label="complete">🏆</span>
+        </button>
+      </nav>
+
       <div
         v-if="championName && !bracketChromeHidden"
-        class="mt-4 rounded-2xl bg-white/10 ring-2 ring-amber-300/60 p-5 text-center text-white"
+        class="mt-4 rounded-2xl bg-ink/10 ring-2 ring-amber-300/60 p-5 text-center text-ink"
       >
         <div class="text-2xl sm:text-3xl font-extrabold leading-tight">
-          {{ championName }} WON!! 🎉🎉
+          {{ championName }} WON{{ tabs.length > 1 && selectedTab ? ` ${selectedTab.name.toUpperCase()}` : '' }}!! 🎉🎉
         </div>
         <div class="mt-1 text-ink/80 font-medium">
           Thank you for playing!
@@ -286,6 +357,7 @@ onBeforeUnmount(async () => {
             :matches="matches"
             :teamNameById="teamNameById"
             :courts="courts"
+            :round-formats="roundFormats"
             :mobile-max-height-offset-px="mobileBracketOffsetPx"
             @viewport-scroll="onBracketViewportScroll"
             @open="openMatchById"
