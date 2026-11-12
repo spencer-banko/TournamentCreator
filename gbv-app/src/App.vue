@@ -23,8 +23,12 @@ const confirmDialogPt = {
     class:
       '!flex !flex-wrap !items-center !justify-center !gap-3 !border-t !border-tone-700/80 !px-8 !pb-8 !pt-6',
   },
-  pcRejectButton: { root: { class: '!min-w-[10rem] !justify-center' } },
-  pcAcceptButton: { root: { class: '!min-w-[10rem] !justify-center' } },
+  pcRejectButton: {
+    root: { class: '!min-w-[10rem] !justify-center !rounded-full !border !border-tone-600/70 !bg-transparent !py-2.5 !font-semibold !text-tone-200' },
+  },
+  pcAcceptButton: {
+    root: { class: '!min-w-[10rem] !justify-center !rounded-full !border-none !bg-amber-500 !py-2.5 !font-semibold !text-white hover:!bg-amber-600' },
+  },
 };
 
 // ECVA uses the light shell everywhere; GT keeps black on non-shell (legacy) routes.

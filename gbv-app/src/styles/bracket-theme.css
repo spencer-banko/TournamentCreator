@@ -73,3 +73,12 @@
   font-weight: 600;
   font-size: 0.9rem;
 }
+/* ECVA (light theme): bracket tiles are solid white cards instead of translucent glass. */
+:root[data-theme='ecva'] .match-tile {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(var(--shadow-rgb), 0.10);
+}
+:root[data-theme='ecva'] .match-tile:hover {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(var(--shadow-rgb), 0.12);
+}

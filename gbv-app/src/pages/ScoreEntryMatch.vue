@@ -15,6 +15,7 @@ import { advanceWinnerToNextById } from '../lib/bracket';
 import { poolFormatForSize } from '../lib/schedule';
 import { formatFromMatch, formatLabel, matchResult, targetForSet, validateSet, validateMatch } from '../lib/scoring';
 import UiBackButton from '../components/ui/UiBackButton.vue';
+import { matchContext } from '../lib/matchContext';
 import type { MatchFormat, SetScore } from '../types/db';
 
 type UUID = string;
@@ -24,6 +25,7 @@ type Match = {
   pool_id: UUID | null;
   round_number: number | null;
   bracket_round: number | null;
+  bracket_id: UUID | null;
   team1_id: UUID | null;
   team2_id: UUID | null;
   team1_score: number | null;
@@ -52,6 +54,7 @@ const loading = ref(false);
 const submitting = ref(false);
 const teams = ref<Team[]>([]);
 const match = ref<Match | null>(null);
+const where = ref('');
 
 /** Per-set entry; null = not entered yet. */
 const sets = ref<Array<{ t1: number | null; t2: number | null }>>([{ t1: null, t2: null }]);
@@ -95,7 +98,7 @@ const errors = computed(() => validateMatch(filledSets.value, format.value));
 const ready = computed(() => canEditScore.value && filledSets.value.length > 0 && errors.value.length === 0);
 
 const summary = computed(() => {
-  if (!match.value || !result.value.complete) return '';
+  if (!match.value || !result.value.complete || errors.value.length) return '';
   const w = result.value.winner === 1 ? match.value.team1_id : match.value.team2_id;
   if (!isMatchPlay.value) return `${nameFor(w)} wins`;
   return `${nameFor(w)} wins ${Math.max(result.value.setsWon1, result.value.setsWon2)}–${Math.min(result.value.setsWon1, result.value.setsWon2)}`;
@@ -138,7 +141,7 @@ async function loadMatch() {
   if (!session.tournament || !matchId.value) return;
   const { data, error } = await supabase
     .from('matches')
-    .select('id,pool_id,round_number,bracket_round,team1_id,team2_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,match_type,best_of,set_targets,set_scores,court')
+    .select('id,pool_id,round_number,bracket_round,bracket_id,team1_id,team2_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,match_type,best_of,set_targets,set_scores,court')
     .eq('tournament_id', session.tournament.id)
     .eq('id', matchId.value)
     .single();
@@ -148,6 +151,7 @@ async function loadMatch() {
   }
   const m = data as Match;
   match.value = m;
+  void matchContext(m).then((c) => (where.value = c.where));
   const f = formatFromMatch(m);
   if (f.bestOf > 1 && Array.isArray(m.set_scores) && m.set_scores.length) {
     sets.value = m.set_scores.map((s) => ({ t1: s.t1, t2: s.t2 }));
@@ -250,7 +254,7 @@ onMounted(async () => {
 
       <div v-if="match" class="mt-4 rounded-2xl border border-tone-600/40 bg-tone-800/50 p-4">
         <div class="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wider text-tone-400">
-          <span>{{ match.match_type === 'bracket' ? 'Bracket' : 'Pool' }}{{ match.round_number ? ` · Round ${match.round_number}` : '' }}</span>
+          <span>{{ where || (match.match_type === 'bracket' ? 'Bracket' : 'Pool') }}</span>
           <span class="rounded-full bg-amber-500/15 px-2 py-0.5 normal-case tracking-normal text-amber-400">{{ formatLabel(format) }}</span>
         </div>
         <p v-if="isMatchPlay" class="mt-2 text-sm text-tone-300">

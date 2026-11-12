@@ -7,6 +7,7 @@ import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
 import PublicLayout from '../components/layout/PublicLayout.vue';
 import UiBackButton from '../components/ui/UiBackButton.vue';
+import { matchContext } from '../lib/matchContext';
 
 type UUID = string;
 
@@ -31,6 +32,8 @@ type Match = {
   set_targets: number[] | null;
   set_scores: Array<{ t1: number; t2: number }> | null;
   court: string | null;
+  bracket_round: number | null;
+  bracket_id: UUID | null;
 };
 
 type Team = { id: UUID; full_team_name: string };
@@ -106,7 +109,7 @@ async function loadMatch() {
   }
   const { data, error } = await supabase
     .from('matches')
-    .select('id,tournament_id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,best_of,set_targets,set_scores,court')
+    .select('id,tournament_id,pool_id,round_number,team1_id,team2_id,ref_team_id,team1_score,team2_score,winner_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,best_of,set_targets,set_scores,court,bracket_round,bracket_id')
     .eq('id', matchId.value)
     .eq('tournament_id', session.tournament.id)
     .single();
@@ -117,6 +120,15 @@ async function loadMatch() {
     return;
   }
   match.value = data as Match;
+  await loadContext();
+}
+
+/** Heading such as "Gold · Semifinals · Best of 3 (21, 21, 15)". */
+const contextLabel = ref('');
+async function loadContext() {
+  if (!match.value) return;
+  const c = await matchContext(match.value);
+  contextLabel.value = `${c.where} · ${c.format}`;
 }
 
 async function loadTeams() {
@@ -256,7 +268,7 @@ onBeforeUnmount(() => {
       <div v-if="match" class="mt-3">
         <div class="flex items-center justify-between">
           <div class="text-sm text-ink/80">
-            Round {{ match.round_number ?? '—' }} • {{ match.match_type === 'bracket' ? 'Bracket' : 'Pool' }}
+            {{ contextLabel || `Round ${match.round_number ?? '—'} • ${match.match_type === 'bracket' ? 'Bracket' : 'Pool'}` }}
           </div>
           <div
             v-if="isLiveActive(match)"
@@ -344,9 +356,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="mt-6 grid grid-cols-1 gap-4" :class="(match.best_of ?? 1) > 1 ? '' : 'sm:grid-cols-2'">
           <Button
-            label="Enter Final Score"
+            :label="(match.best_of ?? 1) > 1 ? 'Enter Set Scores' : 'Enter Final Score'"
             icon="pi pi-pencil"
             :disabled="!canEditScore"
             severity="secondary"
@@ -354,7 +366,9 @@ onBeforeUnmount(() => {
             class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
             @click="goManual"
           />
+          <!-- The live scoreboard tracks a single set, so it is offered only for 1-set matches. -->
           <Button
+            v-if="(match.best_of ?? 1) <= 1"
             :label="isLiveActive(match) ? 'View Live Score' : 'Use Live Scoreboard'"
             icon="pi pi-bolt"
             :disabled="!canEditScore"

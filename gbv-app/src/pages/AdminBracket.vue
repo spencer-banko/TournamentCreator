@@ -278,14 +278,7 @@ watch(selectedId, () => (editOpen.value = false));
 
 onMounted(async () => {
   await session.refreshAdminUser();
-  if (session.accessCode && !session.tournament) {
-    try {
-      await session.ensureAnon();
-      await session.loadTournamentByCode(session.accessCode);
-    } catch {
-      /* ignore */
-    }
-  }
+  await session.restoreAdminTournament();
   if (session.tournament) {
     await loadAll();
     startPolling();
@@ -498,6 +491,8 @@ onBeforeUnmount(stopPolling);
       :match="editing"
       :teams="teams"
       :context="editing && selected ? `${selected.name} · ${roundName(editing.bracket_round ?? 1, totalRounds)}` : ''"
+      :is-final="!!editing && editing.bracket_round === totalRounds"
+      :bracket-name="selected?.name"
       @saved="loadAll({ quiet: true })"
     />
   </div>

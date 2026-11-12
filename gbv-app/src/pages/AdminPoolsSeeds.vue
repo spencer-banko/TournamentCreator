@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
+import { useConfirmAsync } from '../lib/useConfirmAsync';
 import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
@@ -34,6 +35,7 @@ type Team = {
 
 const router = useRouter();
 const toast = useToast();
+const askConfirm = useConfirmAsync();
 const session = useSessionStore();
 
 const accessCode = ref<string>(session.accessCode ?? '');
@@ -558,7 +560,7 @@ async function applyPoolsImport() {
     return;
   }
 
-  const ok = confirm(
+  const ok = await askConfirm(
     'Import pools from CSV?\n\nThis will:\n- Delete ALL matches (pool + bracket)\n- Delete ALL pools\n- Delete ALL teams\n- Recreate teams, pools, and seeds from the CSV\n\nContinue?'
   );
   if (!ok) return;
@@ -784,7 +786,7 @@ async function saveSelectedPool() {
 
 async function deletePool(p: Pool) {
   if (!session.tournament) return;
-  const ok = confirm(`Delete pool "${p.name}"? Teams will become unassigned.`);
+  const ok = await askConfirm(`Delete pool "${p.name}"? Teams will become unassigned.`);
   if (!ok) return;
   saving.value = true;
   try {
@@ -885,9 +887,9 @@ async function autogeneratePools() {
     }
 
     // Compute pool sizes (prefer 5, allow 4). Block on impossible counts like 6,7,11.
-    const sizes = computePoolSizes(N);
+    const sizes = computePoolSizes(N, poolSize.value);
     if (!sizes) {
-      toast.add({ severity: 'error', summary: 'Cannot partition', detail: `Player count ${N} cannot be partitioned into pools of 4 or 5. Adjust players.`, life: 4000 });
+      toast.add({ severity: 'error', summary: 'Cannot partition', detail: `${N} teams cannot be split into pools of 3–6 teams.`, life: 4000 });
       return;
     }
 
@@ -897,7 +899,7 @@ async function autogeneratePools() {
     const poolMatches = await hasExistingPoolMatches(tournamentId);
 
     if (existingPools || anyAssigned || poolMatches) {
-      const ok = confirm('Autogenerate will delete all existing pools and all pool-play matches, then recreate pools and assignments. Continue?');
+      const ok = await askConfirm('Autogenerate will delete all existing pools and all pool-play matches, then recreate pools and assignments. Continue?');
       if (!ok) return;
 
       // Delete matches (pool)
@@ -1021,21 +1023,30 @@ async function autogeneratePools() {
   }
 }
 
-// Return array of pool sizes (5s then 4s) or null if impossible
-function computePoolSizes(n: number): number[] | null {
-  // Try max number of 5s, reduce until remainder divisible by 4
-  for (let fives = Math.floor(n / 5); fives >= 0; fives--) {
-    const rem = n - fives * 5;
-    if (rem === 0) {
-      return Array(fives).fill(5);
-    }
-    if (rem > 0 && rem % 4 === 0) {
-      const fours = rem / 4;
-      return Array(fives).fill(5).concat(Array(fours).fill(4));
-    }
-  }
-  return null;
+/**
+ * Split n teams into pools near the preferred size: use ceil(n / preferred) pools and spread
+ * teams evenly, bigger pools first. E.g. 36 @6 -> 6x6; 35 @4 -> 8x4 + 1x3; 23 @5 -> 3x5 + 2x4.
+ * Returns null when a pool would end up outside 3-6 teams.
+ */
+function computePoolSizes(n: number, preferred = 5): number[] | null {
+  if (n < 3) return null;
+  const P = Math.ceil(n / preferred);
+  const base = Math.floor(n / P);
+  const extra = n - base * P;
+  const sizes = Array.from({ length: P }, (_, i) => base + (i < extra ? 1 : 0));
+  return sizes.every((s) => s >= 3 && s <= 6) ? sizes : null;
 }
+
+const poolSize = ref<4 | 5 | 6>(5);
+const poolSizePreview = computed(() => {
+  const n = teams.value.length;
+  const sizes = computePoolSizes(n, poolSize.value);
+  if (!n) return 'No teams yet';
+  if (!sizes) return `${n} teams can't be split into pools of 3–6`;
+  const counts = new Map<number, number>();
+  sizes.forEach((x) => counts.set(x, (counts.get(x) ?? 0) + 1));
+  return `${n} teams → ` + [...counts.entries()].sort((a, b) => b[0] - a[0]).map(([sz, c]) => `${c} pool${c > 1 ? 's' : ''} of ${sz}`).join(' + ');
+});
 
 async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
   const { data, error } = await supabase
@@ -1099,11 +1110,29 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
 
     <!-- Autogenerate Pools -->
     <div v-if="session.tournament" class="mt-4 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="text-sm">
           <div class="font-semibold text-ink">Autogenerate Pools</div>
           <div class="mt-1 text-tone-300">
-            Creates pools of size 4 or 5 (prefers 5) from global seeds, assigns courts, and seeds within pools using snake distribution.
+            Creates pools from global seeds, assigns courts, and seeds within pools using snake distribution.
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold text-tone-400">Pool size</span>
+            <div class="inline-flex rounded-full border border-tone-600/70 bg-tone-900/40 p-0.5" role="radiogroup" aria-label="Preferred pool size">
+              <button
+                v-for="n in ([4, 5, 6] as const)"
+                :key="n"
+                type="button"
+                role="radio"
+                :aria-checked="poolSize === n"
+                class="rounded-full px-3 py-1 text-xs font-semibold transition"
+                :class="poolSize === n ? 'bg-amber-500 text-white shadow-sm' : 'text-tone-300 hover:text-ink'"
+                @click="poolSize = n"
+              >
+                {{ n }}
+              </button>
+            </div>
+            <span class="text-xs text-tone-400">{{ poolSizePreview }}</span>
           </div>
         </div>
         <Button

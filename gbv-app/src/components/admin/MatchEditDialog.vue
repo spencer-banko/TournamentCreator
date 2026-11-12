@@ -23,6 +23,10 @@ const props = defineProps<{
   teams: TeamOpt[];
   /** Optional heading context, e.g. "Pool A · Round 3" or "Gold · Semifinals". */
   context?: string;
+  /** Bracket final: a win crowns the champion instead of advancing. */
+  isFinal?: boolean;
+  /** Bracket name for the champion message, e.g. "Gold". */
+  bracketName?: string;
 }>();
 const emit = defineEmits<{ (e: 'update:visible', v: boolean): void; (e: 'saved'): void }>();
 
@@ -226,7 +230,7 @@ async function clearScore() {
         <div class="grid grid-cols-[1fr_auto] items-end gap-2">
           <label class="grid gap-1.5">
             <span class="text-xs font-semibold uppercase tracking-wide text-tone-400">Team 1</span>
-            <Select v-model="team1" :options="teamOptions" optionLabel="label" optionValue="value" filter class="w-full" placeholder="TBD" />
+            <Select v-model="team1" :options="teamOptions" optionLabel="label" optionValue="value" filter class="w-full !rounded-lg !border !border-tone-600/70 !bg-paper !shadow-none" placeholder="TBD" />
           </label>
           <Button
             icon="pi pi-arrow-right-arrow-left"
@@ -240,7 +244,7 @@ async function clearScore() {
         </div>
         <label class="grid gap-1.5 pr-12">
           <span class="text-xs font-semibold uppercase tracking-wide text-tone-400">Team 2</span>
-          <Select v-model="team2" :options="teamOptions" optionLabel="label" optionValue="value" filter class="w-full" placeholder="TBD" />
+          <Select v-model="team2" :options="teamOptions" optionLabel="label" optionValue="value" filter class="w-full !rounded-lg !border !border-tone-600/70 !bg-paper !shadow-none" placeholder="TBD" />
         </label>
         <p v-if="sameTeam" class="text-sm font-medium text-red-300">Team 1 and Team 2 must be different.</p>
       </section>
@@ -249,15 +253,15 @@ async function clearScore() {
       <section class="grid grid-cols-2 gap-3" :class="isBracket ? '' : 'sm:grid-cols-3'">
         <label v-if="!isBracket" class="col-span-2 grid gap-1.5 sm:col-span-1">
           <span class="text-xs font-semibold uppercase tracking-wide text-tone-400">Ref</span>
-          <Select v-model="refTeam" :options="teamOptions" optionLabel="label" optionValue="value" filter class="w-full" placeholder="None" />
+          <Select v-model="refTeam" :options="teamOptions" optionLabel="label" optionValue="value" filter class="w-full !rounded-lg !border !border-tone-600/70 !bg-paper !shadow-none" placeholder="None" />
         </label>
         <label v-if="!isBracket" class="grid gap-1.5">
           <span class="text-xs font-semibold uppercase tracking-wide text-tone-400">Order</span>
-          <InputText :modelValue="round == null ? '' : String(round)" type="number" min="1" class="w-full" @update:modelValue="(v) => (round = v ? Number(v) : null)" />
+          <InputText :modelValue="round == null ? '' : String(round)" type="number" min="1" class="w-full !rounded-lg !border !border-tone-600/70 !bg-paper !shadow-none" @update:modelValue="(v) => (round = v ? Number(v) : null)" />
         </label>
         <label class="grid gap-1.5">
           <span class="text-xs font-semibold uppercase tracking-wide text-tone-400">Court</span>
-          <InputText v-model="court" placeholder="e.g. 3" class="w-full" />
+          <InputText v-model="court" placeholder="e.g. 3" class="w-full !rounded-lg !border !border-tone-600/70 !bg-paper !shadow-none" />
         </label>
       </section>
 
@@ -311,9 +315,9 @@ async function clearScore() {
             class="grid grid-cols-[1fr_repeat(var(--cols),3.5rem)] items-center gap-x-2 border-t border-tone-600/40 px-3 py-2"
             :style="{ '--cols': sets.length }"
           >
-            <span class="truncate text-sm font-semibold" :class="result.winner === side ? 'text-emerald-300' : 'text-ink'">
+            <span class="truncate text-sm font-semibold" :class="result.winner === side && !errors.length ? 'text-emerald-300' : 'text-ink'">
               {{ nameOf(side === 1 ? team1 : team2) }}
-              <span v-if="result.winner === side" class="ml-1 text-[10px] font-bold uppercase tracking-wide">Won</span>
+              <span v-if="result.winner === side && !errors.length" class="ml-1 text-[10px] font-bold uppercase tracking-wide">Won</span>
             </span>
             <input
               v-for="(s, i) in sets"
@@ -329,8 +333,9 @@ async function clearScore() {
           <li v-for="e in errors" :key="e">{{ e }}</li>
         </ul>
         <p v-else-if="hasScores && result.complete" class="text-sm text-tone-300">
-          {{ nameOf(result.winner === 1 ? team1 : team2) }} win{{ bestOf > 1 ? ` ${Math.max(result.setsWon1, result.setsWon2)}–${Math.min(result.setsWon1, result.setsWon2)}` : '' }}.
-          <span v-if="isBracket">They'll move to the next round.</span>
+          {{ nameOf(result.winner === 1 ? team1 : team2) }} wins{{ bestOf > 1 ? ` ${Math.max(result.setsWon1, result.setsWon2)}–${Math.min(result.setsWon1, result.setsWon2)}` : '' }}.
+          <span v-if="isBracket && isFinal">They win {{ bracketName || 'the bracket' }}.</span>
+          <span v-else-if="isBracket">They'll move to the next round.</span>
         </p>
         <p v-else class="text-xs text-tone-500">{{ formatLabel({ bestOf, setTargets: targets }) }}. Leave blank to keep the match unplayed.</p>
       </section>

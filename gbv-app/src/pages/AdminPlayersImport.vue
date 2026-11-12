@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
+import { useConfirmAsync } from '../lib/useConfirmAsync';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
@@ -26,6 +27,7 @@ type TeamRow = {
 
 const router = useRouter();
 const toast = useToast();
+const askConfirm = useConfirmAsync();
 const session = useSessionStore();
 
 const accessCode = ref<string>('');
@@ -177,7 +179,7 @@ async function applyEdit() {
 
 async function deleteTeam(team: TeamRow) {
   if (!session.tournament) return;
-  const ok = confirm(`Delete "${team.full_team_name}"? This cannot be undone.`);
+  const ok = await askConfirm(`Delete "${team.full_team_name}"? This cannot be undone.`);
   if (!ok) return;
   deletingTeamId.value = team.id;
   try {

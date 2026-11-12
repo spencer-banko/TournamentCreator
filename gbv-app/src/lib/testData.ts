@@ -42,7 +42,9 @@ function generatePlausibleSet(target: number, cap: number, winBy2: boolean): [nu
   // Deuce scenarios
   if (winBy2) {
     // Prefer two-point wins past target; occasionally hit cap with 1-point margin
-    const useCapOnePoint = Math.random() < 0.2 && cap > target;
+    // Only a real, close cap (e.g. 25 for a game to 21) ends a set on a 1-point margin;
+    // large placeholder caps (target + 10, 99) mean "no cap".
+    const useCapOnePoint = Math.random() < 0.2 && cap > target && cap - target < 10;
     if (useCapOnePoint) {
       const winner = cap;
       const loser = Math.max(0, cap - 1); // 25–24 style at cap

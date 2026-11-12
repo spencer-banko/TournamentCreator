@@ -187,14 +187,7 @@ function deleteMatch(m: Match) {
 
 onMounted(async () => {
   await session.refreshAdminUser();
-  if (session.accessCode && !session.tournament) {
-    try {
-      await session.ensureAnon();
-      await session.loadTournamentByCode(session.accessCode);
-    } catch {
-      /* ignore */
-    }
-  }
+  await session.restoreAdminTournament();
   await load();
 });
 </script>

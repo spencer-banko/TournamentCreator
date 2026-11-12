@@ -11,7 +11,8 @@ import './style.css';
 import './styles/bracket-theme.css';
 import App from './App.vue';
 
-document.documentElement.setAttribute('data-theme', import.meta.env.VITE_BRAND ?? 'gt');
+const brandId = import.meta.env.VITE_BRAND ?? 'gt';
+document.documentElement.setAttribute('data-theme', brandId);
 
 const app = createApp(App);
 
@@ -25,6 +26,9 @@ app.use(PrimeVue, {
     preset: Aura,
     options: {
       cssLayer: true,
+      // ECVA is a light app: never switch PrimeVue components to dark, even when the OS is in
+      // dark mode. GT keeps following the system setting as before.
+      darkModeSelector: brandId === 'ecva' ? '.prime-dark-disabled' : 'system',
     },
   },
 });

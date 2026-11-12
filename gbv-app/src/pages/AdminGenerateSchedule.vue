@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
+import { useConfirmAsync } from '../lib/useConfirmAsync';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
@@ -18,6 +19,7 @@ import {
 
 const router = useRouter();
 const toast = useToast();
+const askConfirm = useConfirmAsync();
 const session = useSessionStore();
 
 const accessCode = ref<string>(session.accessCode ?? '');
@@ -102,7 +104,7 @@ async function runPrereqCheck() {
 
 async function deleteExistingPoolMatches() {
   if (!session.tournament) return;
-  const ok = confirm('Delete all existing pool matches for this tournament? This cannot be undone.');
+  const ok = await askConfirm('Delete all existing pool matches for this tournament? This cannot be undone.');
   if (!ok) return false;
   const { error } = await supabase
     .from('matches')
@@ -163,7 +165,7 @@ async function resetPoolMatchScores() {
     return;
   }
 
-  const ok = confirm(
+  const ok = await askConfirm(
     'Reset all pool match scores for this tournament? This will clear submitted and live scores, and cannot be undone.'
   );
   if (!ok) return;

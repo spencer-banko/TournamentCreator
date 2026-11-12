@@ -69,6 +69,28 @@ export const useSessionStore = defineStore('session', {
       }
     },
 
+    /**
+     * Admin tool pages: restore the working tournament after a page reload, preferring the
+     * dashboard's active tournament and falling back to the stored access code.
+     */
+    async restoreAdminTournament(): Promise<Tournament | null> {
+      if (this.tournament) return this.tournament as Tournament;
+      this.initFromStorage();
+      const id = this.getAdminActiveTournamentId();
+      if (id) {
+        const t = await this.loadAdminTournamentById(id);
+        if (t) return t as Tournament;
+      }
+      if (this.accessCode) {
+        try {
+          return ((await this.loadTournamentByCode(this.accessCode)) as Tournament | null) ?? null;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    },
+
     /** Set active admin tournament context (RLS: must be owned by current admin). */
     setAdminActiveTournament(t: Tournament) {
       this.tournament = t;

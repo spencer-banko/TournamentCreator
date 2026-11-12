@@ -583,11 +583,6 @@ function onOpen(m: BracketMatch) {
   z-index: 10;
 }
 
-:global(:root[data-theme='ecva']) .match-tile {
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(var(--shadow-rgb), 0.08);
-}
-
 .match-tile:hover {
   background: rgba(var(--ink-rgb), 0.14);
   border-color: rgba(var(--ink-rgb), 0.28);
