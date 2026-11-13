@@ -354,6 +354,8 @@ async function saveTournament() {
       await bracketsRef.value?.save(form.value.id);
       await syncDefaultTemplates(form.value.id);
       toast.add({ severity: 'success', summary: 'Tournament updated', life: 1500 });
+      // Keep the header switcher / sidebar in sync when editing the active tournament.
+      if (session.tournament?.id === form.value.id) await session.loadAdminTournamentById(form.value.id);
     } else {
       const { data: authData, error: authErr } = await supabase.auth.getUser();
       const user = authData.user;
@@ -411,6 +413,11 @@ async function saveTournament() {
           // Non-blocking: seeding failure will be handled again in prerequisites
           console.warn('Default schedule template seeding failed:', seedErr);
         }
+
+        // A newly created tournament becomes the one you're working on, so the steps unlock.
+        session.setAdminActiveTournament(data as Tournament);
+        await router.replace({ name: 'admin-tournament-setup', query: { edit: newId } });
+        return;
       }
     }
     await tournamentListRef.value?.loadTournaments();
@@ -465,7 +472,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
+  <div class="admin-tool-page text-tone-100">
     <div class="mx-auto max-w-6xl">
     <UiSectionHeading
       variant="dashboard"
@@ -473,14 +480,6 @@ onMounted(async () => {
       subtitle="Create and edit tournaments, rules, and status."
       :divider="true"
     >
-      <Button
-        label="Back"
-        icon="pi pi-arrow-left"
-        severity="secondary"
-        outlined
-        class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
-        @click="router.push({ name: 'admin-dashboard' })"
-      />
     </UiSectionHeading>
 
     <div class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-5">

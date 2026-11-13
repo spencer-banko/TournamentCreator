@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
-import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import MatchEditDialog from '@/components/admin/MatchEditDialog.vue';
 import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
+import { useAdminProgressStore } from '../stores/adminProgress';
 import {
   generateBracket,
   generateAllBrackets,
@@ -22,18 +21,16 @@ import { fillRandomPoolScores, fillRandomBracketScores } from '../lib/testData';
 import { roundName } from '../lib/standings';
 import { formatLabel, setsOf } from '../lib/scoring';
 import { medalFor, placesLabel } from '../lib/bracketStyle';
-import { adminBtnPillPt, adminBtnBluePillClass, adminBtnGreenPillClass } from '@/lib/adminButtonStyles';
+import { adminBtnPillPt, adminBtnGreenPillClass } from '@/lib/adminButtonStyles';
 import type { Bracket, Match, Tournament } from '../types/db';
 
 type Team = { id: string; full_team_name: string; pool_id: string | null };
 
-const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 const session = useSessionStore();
+const progress = useAdminProgressStore();
 
-const accessCode = ref<string>(session.accessCode ?? '');
-const loading = ref(false);
 const busy = ref<string | null>(null); // which action is running
 
 const brackets = ref<Bracket[]>([]);
@@ -97,6 +94,7 @@ async function refreshTournament() {
 }
 
 async function loadAll(opts: { quiet?: boolean } = {}) {
+  if (!opts.quiet) void progress.refresh(); // keep sidebar step statuses current (skip background polls)
   const t = session.tournament;
   if (!t) return;
   try {
@@ -119,24 +117,6 @@ async function loadAll(opts: { quiet?: boolean } = {}) {
     await refreshTournament();
   } catch (e: any) {
     if (!opts.quiet) toast.add({ severity: 'error', summary: 'Failed to load brackets', detail: e?.message ?? String(e), life: 3500 });
-  }
-}
-
-async function loadByCode() {
-  if (!accessCode.value.trim()) return;
-  loading.value = true;
-  try {
-    await session.ensureAnon();
-    session.setAccessCode(accessCode.value.trim());
-    const t = await session.loadTournamentByCode(accessCode.value.trim());
-    if (!t) {
-      toast.add({ severity: 'error', summary: 'Tournament not found', life: 2000 });
-      return;
-    }
-    await loadAll();
-    startPolling();
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -288,21 +268,11 @@ onBeforeUnmount(stopPolling);
 </script>
 
 <template>
-  <div class="admin-bracket-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
+  <div class="admin-bracket-page text-tone-100">
     <UiSectionHeading variant="dashboard" title="Brackets" subtitle="Generate each bracket from pool standings, then click any match to fix teams or scores." :divider="true">
-      <Button label="Back" icon="pi pi-arrow-left" severity="secondary" outlined class="!rounded-xl !border-tone-600/70 !text-tone-200" @click="router.push({ name: 'admin-dashboard' })" />
     </UiSectionHeading>
 
-    <!-- Loader -->
-    <div v-if="!session.tournament" class="mt-4 max-w-xl rounded-2xl border border-tone-600/45 bg-tone-800/50 p-5">
-      <label class="mb-2 block text-sm font-medium text-tone-300">Tournament access code</label>
-      <div class="flex gap-3">
-        <InputText v-model="accessCode" placeholder="e.g. ECVA-MENS" class="w-full !rounded-xl !bg-white !text-slate-900" @keyup.enter="loadByCode" />
-        <Button :loading="loading" label="Load" icon="pi pi-search" :class="adminBtnBluePillClass" :pt="adminBtnPillPt" @click="loadByCode" />
-      </div>
-    </div>
-
-    <template v-else>
+    <template v-if="session.tournament">
       <!-- Readiness bar -->
       <section class="mt-4 flex flex-col gap-4 rounded-2xl border border-tone-600/45 bg-tone-800/50 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">

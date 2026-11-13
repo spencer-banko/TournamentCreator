@@ -133,8 +133,8 @@ defineExpose({ loadTournaments, getTournaments });
   <div
     :class="[
       variant === 'dashboard'
-        ? 'admin-tournament-list-panel--dashboard px-1 sm:px-2'
-        : 'admin-tournament-list-panel--setup px-1 sm:px-2',
+        ? 'admin-tournament-list-panel--dashboard admin-row-table px-1 sm:px-2'
+        : 'admin-tournament-list-panel--setup admin-row-table px-1 sm:px-2',
     ]"
   >
     <DataTable
@@ -300,82 +300,3 @@ defineExpose({ loadTournaments, getTournaments });
   </div>
 </template>
 
-<style scoped>
-.admin-tournament-datatable :deep(.p-datatable-table-container) {
-  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.06);
-}
-
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-thead > tr > th),
-.admin-tournament-list-panel--setup :deep(.p-datatable-thead > tr > th) {
-  padding-left: 1.125rem;
-  padding-right: 0.75rem;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgb(51 65 85 / 0.45);
-  font-size: 1rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.045em;
-  text-transform: uppercase;
-}
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr > td),
-.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr > td) {
-  padding-left: 1.125rem;
-  padding-right: 0.75rem;
-  padding-top: 1.125rem;
-  padding-bottom: 1.125rem;
-  vertical-align: middle;
-  border-color: rgb(51 65 85 / 0.35);
-  transition: background-color 0.15s ease;
-}
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr:hover > td),
-.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr:hover > td) {
-  background-color: rgb(30 41 59 / 0.45) !important;
-}
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-thead > tr > th:first-child),
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr > td:first-child),
-.admin-tournament-list-panel--setup :deep(.p-datatable-thead > tr > th:first-child),
-.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr > td:first-child) {
-  padding-left: 1.25rem;
-}
-.admin-tournament-list-panel--dashboard :deep(.p-datatable-tbody > tr + tr > td),
-.admin-tournament-list-panel--setup :deep(.p-datatable-tbody > tr + tr > td) {
-  border-top-color: rgb(51 65 85 / 0.35);
-}
-
-.admin-tournament-list-panel--dashboard .dashboard-row-action,
-.admin-tournament-list-panel--setup .dashboard-row-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  padding: 0.375rem;
-  color: rgb(148 163 184);
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-.admin-tournament-list-panel--dashboard .dashboard-row-action:focus-visible,
-.admin-tournament-list-panel--setup .dashboard-row-action:focus-visible {
-  outline: 2px solid rgb(251 191 36 / 0.55);
-  outline-offset: 2px;
-}
-.admin-tournament-list-panel--dashboard .dashboard-row-action--danger:focus-visible,
-.admin-tournament-list-panel--setup .dashboard-row-action--danger:focus-visible {
-  outline-color: rgb(248 113 113 / 0.55);
-}
-.admin-tournament-list-panel--dashboard .dashboard-row-action:hover:not(:disabled),
-.admin-tournament-list-panel--setup .dashboard-row-action:hover:not(:disabled) {
-  color: rgb(251 191 36);
-  background-color: rgb(251 191 36 / 0.12);
-}
-.admin-tournament-list-panel--dashboard .dashboard-row-action--danger:hover:not(:disabled),
-.admin-tournament-list-panel--setup .dashboard-row-action--danger:hover:not(:disabled) {
-  color: rgb(248 113 113);
-  background-color: rgb(248 113 113 / 0.12);
-}
-.admin-tournament-list-panel--dashboard .dashboard-row-action:disabled,
-.admin-tournament-list-panel--setup .dashboard-row-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-</style>

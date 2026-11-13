@@ -8,6 +8,8 @@ import { useSessionStore } from '../stores/session';
 import PublicLayout from '../components/layout/PublicLayout.vue';
 import { advanceWinnerToNextById } from '../lib/bracket';
 import UiBackButton from '../components/ui/UiBackButton.vue';
+import { formatFromMatch, recordSet, swapSets, targetForSet } from '../lib/scoring';
+import type { SetScore } from '../types/db';
 
 type UUID = string;
 
@@ -25,7 +27,15 @@ type Match = {
   live_last_active_at: string | null;
   match_type: 'pool' | 'bracket';
   round_number: number | null;
+  team1_score: number | null;
+  team2_score: number | null;
+  best_of: number | null;
+  set_targets: number[] | null;
+  set_scores: SetScore[] | null;
 };
+
+const MATCH_COLUMNS =
+  'id,tournament_id,pool_id,team1_id,team2_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,round_number,team1_score,team2_score,best_of,set_targets,set_scores';
 
 const route = useRoute();
 const router = useRouter();
@@ -53,6 +63,18 @@ const liveOwnerId = ref<string | null>(null);
 const liveLastActiveAt = ref<string | null>(null);
 const myUserId = ref<string | null>(null);
 const pausedForInactivity = ref(false);
+
+// Match play (best of 3): the live board scores one set at a time — the next unrecorded set.
+const bestOf = ref<number>(1);
+const setTargets = ref<number[] | null>(null);
+const setScores = ref<SetScore[]>([]);
+const matchPlayDone = ref(false);
+const isMatchPlay = computed(() => bestOf.value > 1);
+const currentSet = computed(() => setScores.value.length + 1);
+const setsWon = computed(() => ({
+  t1: setScores.value.filter((x) => x.t1 > x.t2).length,
+  t2: setScores.value.filter((x) => x.t2 > x.t1).length,
+}));
 
 // Prevent stale/out-of-order realtime events from overwriting newer local writes while we own the live session.
 const myLatestWriteAtMs = ref<number>(0);
@@ -182,6 +204,10 @@ function setFromMatch(m: Match | null) {
   team1Id.value = m.team1_id;
   team2Id.value = m.team2_id;
   roundNumber.value = m.round_number ?? null;
+  bestOf.value = m.best_of === 3 ? 3 : 1;
+  setTargets.value = m.set_targets ?? null;
+  setScores.value = Array.isArray(m.set_scores) ? m.set_scores : [];
+  matchPlayDone.value = bestOf.value > 1 && m.team1_score != null && m.team2_score != null;
   score1.value = Math.max(0, m.live_score_team1 ?? 0);
   score2.value = Math.max(0, m.live_score_team2 ?? 0);
   isLive.value = isLiveLeaseActive(m) || (!!myUserId.value && m.live_owner_id === myUserId.value);
@@ -203,7 +229,7 @@ async function loadMatch() {
   if (!session.tournament || !matchId.value) return;
   const { data, error } = await supabase
     .from('matches')
-    .select('id,tournament_id,pool_id,team1_id,team2_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,round_number')
+    .select(MATCH_COLUMNS)
     .eq('tournament_id', session.tournament.id)
     .eq('id', matchId.value)
     .single();
@@ -227,6 +253,11 @@ async function ensureBracketStartedIfBracket(m: Match) {
 async function claimLiveIfPossible() {
   if (!session.tournament || !matchId.value) return;
   if (!myUserId.value) return;
+  if (matchPlayDone.value) {
+    canControl.value = false;
+    toast.add({ severity: 'info', summary: 'Match complete', detail: 'Every needed set has been recorded.', life: 2500 });
+    return;
+  }
   if (!team1Id.value || !team2Id.value) {
     toast.add({ severity: 'warn', summary: 'Cannot start live', detail: 'Both teams must be set for live scoring.', life: 2500 });
     canControl.value = false;
@@ -249,7 +280,7 @@ async function claimLiveIfPossible() {
     .eq('tournament_id', session.tournament.id)
     .eq('id', matchId.value)
     .or(`is_live.eq.false,live_owner_id.is.null,live_owner_id.eq.${myUserId.value},live_last_active_at.is.null,live_last_active_at.lt.${staleIso}`)
-    .select('id,tournament_id,pool_id,team1_id,team2_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,round_number');
+    .select(MATCH_COLUMNS);
 
   if (error) {
     toast.add({ severity: 'error', summary: 'Unable to start live', detail: error.message, life: 2500 });
@@ -348,7 +379,9 @@ async function flipScores() {
   if (!team1Id.value || !team2Id.value) return;
   markInteraction();
 
-  const prev = { s1: score1.value, s2: score2.value, t1: team1Id.value, t2: team2Id.value };
+  const prev = { s1: score1.value, s2: score2.value, t1: team1Id.value, t2: team2Id.value, sets: setScores.value };
+  // Recorded sets are stored from team1's perspective, so they swap along with the teams.
+  const nsets = isMatchPlay.value ? swapSets(prev.sets) : null;
   const ns1 = prev.s2;
   const ns2 = prev.s1;
   const nt1 = prev.t2;
@@ -359,6 +392,7 @@ async function flipScores() {
   score2.value = ns2;
   team1Id.value = nt1;
   team2Id.value = nt2;
+  if (nsets) setScores.value = nsets;
 
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
@@ -368,6 +402,7 @@ async function flipScores() {
     .update({
       team1_id: nt1,
       team2_id: nt2,
+      ...(nsets ? { set_scores: nsets } : {}),
       live_score_team1: ns1,
       live_score_team2: ns2,
       is_live: true,
@@ -376,7 +411,7 @@ async function flipScores() {
     })
     .eq('id', liveMatchId.value)
     .eq('live_owner_id', myUserId.value)
-    .select('id,tournament_id,pool_id,team1_id,team2_id,is_live,live_score_team1,live_score_team2,live_owner_id,live_last_active_at,match_type,round_number');
+    .select(MATCH_COLUMNS);
 
   if (error) {
     myPendingWriteAtMs.value = 0;
@@ -384,6 +419,7 @@ async function flipScores() {
     score2.value = prev.s2;
     team1Id.value = prev.t1;
     team2Id.value = prev.t2;
+    setScores.value = prev.sets;
     toast.add({ severity: 'error', summary: 'Flip failed', detail: error.message, life: 2500 });
     return;
   }
@@ -418,7 +454,9 @@ function getActiveRuleSet(): RuleSet {
   const capDefault = 99;
 
   let target = phase?.setTarget ?? 21;
-  if (mt === 'pool') {
+  if (bestOf.value > 1) {
+    target = targetForSet(formatFromMatch({ best_of: bestOf.value, set_targets: setTargets.value }), currentSet.value);
+  } else if (mt === 'pool') {
     const bySize = (gr?.pool as any)?.setTargetByPoolSize;
     const sz = poolSize.value;
     if (sz != null) {
@@ -445,6 +483,36 @@ const hasWinner = computed(() => {
   return high >= r.target;
 });
 
+// ---------- Side-switch reminder ----------
+// Beach rule: switch every 7 points in sets to 21+, every 5 points in a set to 15.
+const switchEvery = computed(() => (getActiveRuleSet().target <= 15 ? 5 : 7));
+const totalPoints = computed(() => (score1.value ?? 0) + (score2.value ?? 0));
+/** Total at which the reminder was flipped or dismissed, so it doesn't re-show for the same switch. */
+const switchHandledAt = ref<number | null>(null);
+const switchDue = computed(
+  () =>
+    totalPoints.value > 0 &&
+    totalPoints.value % switchEvery.value === 0 &&
+    !hasWinner.value &&
+    switchHandledAt.value !== totalPoints.value,
+);
+function dismissSwitch() {
+  switchHandledAt.value = totalPoints.value;
+}
+async function flipFromReminder() {
+  await flipScores();
+  switchHandledAt.value = totalPoints.value;
+}
+watch(switchDue, (due) => {
+  if (due && canControl.value) {
+    try {
+      navigator.vibrate?.([120, 80, 120]);
+    } catch {
+      // vibration unsupported
+    }
+  }
+});
+
 const winnerId = computed<UUID | null>(() => {
   const s1 = score1.value ?? 0;
   const s2 = score2.value ?? 0;
@@ -468,7 +536,9 @@ watch(
 
     const winTeamId = winnerId.value;
     const winTeam = nameFor(winTeamId);
-    const ok = confirm(`Submit final score?\n\n${nameFor(team1Id.value)} ${s1} – ${s2} ${nameFor(team2Id.value)}\nWinner: ${winTeam}`);
+    const ok = isMatchPlay.value
+      ? confirm(`Submit Set ${currentSet.value}?\n\n${nameFor(team1Id.value)} ${s1} – ${s2} ${nameFor(team2Id.value)}\nSet winner: ${winTeam}`)
+      : confirm(`Submit final score?\n\n${nameFor(team1Id.value)} ${s1} – ${s2} ${nameFor(team2Id.value)}\nWinner: ${winTeam}`);
     if (ok) {
       await submitFinal();
     }
@@ -527,12 +597,27 @@ async function submitFinal() {
     winId,
   });
 
+  let scorePayload: Record<string, unknown> = {
+    team1_score: score1.value ?? 0,
+    team2_score: score2.value ?? 0,
+    winner_id: winId,
+  };
+  let matchWinnerId: string | null = winId;
+  let doneMessage = 'Final submitted';
+  if (isMatchPlay.value) {
+    const setNo = currentSet.value;
+    const r = recordSet(setScores.value, setNo, { t1: score1.value ?? 0, t2: score2.value ?? 0 }, bestOf.value);
+    matchWinnerId = r.winnerSide === 1 ? team1Id.value : r.winnerSide === 2 ? team2Id.value : null;
+    scorePayload = { set_scores: r.set_scores, team1_score: r.team1_score, team2_score: r.team2_score, winner_id: matchWinnerId };
+    doneMessage = matchWinnerId
+      ? `${nameFor(matchWinnerId)} wins the match ${Math.max(r.result.setsWon1, r.result.setsWon2)}–${Math.min(r.result.setsWon1, r.result.setsWon2)}`
+      : `Set ${setNo} saved · sets ${r.result.setsWon1}–${r.result.setsWon2}`;
+  }
+
   const { data, error } = await supabase
     .from('matches')
     .update({
-      team1_score: score1.value ?? 0,
-      team2_score: score2.value ?? 0,
-      winner_id: winId,
+      ...scorePayload,
       is_live: false,
       live_score_team1: null,
       live_score_team2: null,
@@ -568,13 +653,15 @@ async function submitFinal() {
       .eq('bracket_started', false);
 
     // Auto-advance winner into next round slot (do not overwrite manual changes)
-    const adv = await advanceWinnerToNextById(session.tournament.id, liveMatchId.value);
-    if (adv.error) {
-      toast.add({ severity: 'warn', summary: 'Bracket advance skipped', detail: adv.error, life: 3000 });
+    if (matchWinnerId) {
+      const adv = await advanceWinnerToNextById(session.tournament.id, liveMatchId.value);
+      if (adv.error) {
+        toast.add({ severity: 'warn', summary: 'Bracket advance skipped', detail: adv.error, life: 3000 });
+      }
     }
   }
 
-  toast.add({ severity: 'success', summary: 'Final submitted', life: 1600 });
+  toast.add({ severity: 'success', summary: doneMessage, life: 2500 });
   // Navigate back to match actions
   router.push({ name: 'match-actions', params: { accessCode: accessCode.value, matchId: liveMatchId.value }, query: from.value ? { from: from.value } : undefined });
 }
@@ -714,6 +801,10 @@ onBeforeUnmount(async () => {
         <div class="mt-1">
           <div class="text-sm text-ink/80">
             {{ matchType === 'bracket' ? 'Bracket' : matchType === 'pool' ? 'Pool' : 'Match' }} • Round {{ roundNumber ?? '—' }}
+            <template v-if="isMatchPlay">
+              • <span class="font-semibold text-ink">Set {{ currentSet }} of {{ bestOf }}</span> (to {{ getActiveRuleSet().target }})
+              <template v-if="setScores.length"> • Sets {{ setsWon.t1 }}–{{ setsWon.t2 }}</template>
+            </template>
           </div>
           <div class="mt-2">
             <div class="text-xl font-semibold text-ink leading-tight">{{ nameFor(team1Id) }}</div>
@@ -737,7 +828,40 @@ onBeforeUnmount(async () => {
         </div>
 
         <div class="mt-6 grid grid-cols-1 gap-6">
-          <div class="rounded-xl bg-ink/10 ring-1 ring-ink/20 p-4 sm:p-6">
+          <div
+            class="rounded-xl p-4 transition-all sm:p-6"
+            :class="switchDue ? 'switch-due bg-yellow-300/25 ring-4 ring-yellow-400' : 'bg-ink/10 ring-1 ring-ink/20'"
+          >
+            <div
+              v-if="switchDue"
+              role="alert"
+              class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-yellow-400 px-4 py-3 text-slate-900 shadow-lg"
+            >
+              <div class="flex items-center gap-3">
+                <i class="pi pi-sync text-2xl" aria-hidden="true" />
+                <div>
+                  <div class="text-lg font-black uppercase tracking-wide">Switch sides</div>
+                  <div class="text-sm font-medium">{{ totalPoints }} points played ({{ score1 }}–{{ score2 }})</div>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  v-if="canControl"
+                  type="button"
+                  class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white active:scale-[0.98]"
+                  @click="flipFromReminder"
+                >
+                  <i class="pi pi-refresh mr-1 text-xs" />Flip Sides
+                </button>
+                <button
+                  type="button"
+                  class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-yellow-300"
+                  @click="dismissSwitch"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
             <div class="grid grid-cols-2 gap-3 sm:gap-4">
               <div class="flex flex-col gap-2">
                 <button
@@ -746,9 +870,9 @@ onBeforeUnmount(async () => {
                   :disabled="!canControl"
                   @click="inc(1)"
                 >
-                  <div class="text-sm font-semibold text-ink/90 truncate w-full">{{ nameFor(team1Id) }}</div>
+                  <div class="text-sm font-semibold text-white/90 truncate w-full">{{ nameFor(team1Id) }}</div>
                   <div class="mt-2 text-7xl sm:text-8xl font-black tabular-nums">{{ score1 }}</div>
-                  <div class="mt-2 text-base font-semibold text-ink/90">+1</div>
+                  <div class="mt-2 text-base font-semibold text-white/90">+1</div>
                 </button>
                 <button
                   class="w-full rounded-2xl bg-ink/10 ring-1 ring-ink/20 py-3 text-base font-semibold text-ink"
@@ -767,9 +891,9 @@ onBeforeUnmount(async () => {
                   :disabled="!canControl"
                   @click="inc(2)"
                 >
-                  <div class="text-sm font-semibold text-ink/90 truncate w-full">{{ nameFor(team2Id) }}</div>
+                  <div class="text-sm font-semibold text-white/90 truncate w-full">{{ nameFor(team2Id) }}</div>
                   <div class="mt-2 text-7xl sm:text-8xl font-black tabular-nums">{{ score2 }}</div>
-                  <div class="mt-2 text-base font-semibold text-ink/90">+1</div>
+                  <div class="mt-2 text-base font-semibold text-white/90">+1</div>
                 </button>
                 <button
                   class="w-full rounded-2xl bg-ink/10 ring-1 ring-ink/20 py-3 text-base font-semibold text-ink"
@@ -790,11 +914,11 @@ onBeforeUnmount(async () => {
                 class="!rounded-2xl !px-6 !py-3 !text-base"
                 severity="contrast"
                 :disabled="!canControl"
-                @click="flipScores"
+                @click="flipFromReminder"
               />
               <Button
                 v-if="canControl"
-                label="Submit Final Score"
+                :label="isMatchPlay ? `Submit Set ${currentSet}` : 'Submit Final Score'"
                 size="large"
                 icon="pi pi-check-circle"
                 class="!rounded-2xl !px-6 !py-3 !text-base !font-semibold border-none text-white gbv-grad-blue"
@@ -829,3 +953,16 @@ onBeforeUnmount(async () => {
       </section>
   </PublicLayout>
 </template>
+
+<style scoped>
+.switch-due {
+  animation: switch-pulse 1.2s ease-in-out infinite;
+}
+@keyframes switch-pulse {
+  0%, 100% { background-color: rgba(253, 224, 71, 0.2); }
+  50% { background-color: rgba(253, 224, 71, 0.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch-due { animation: none; }
+}
+</style>

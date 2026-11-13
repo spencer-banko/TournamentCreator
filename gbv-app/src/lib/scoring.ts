@@ -195,3 +195,35 @@ export function formatLabel(f: MatchFormat): string {
   if (f.bestOf > 1) return `Best of ${f.bestOf} (${f.setTargets.join(', ')})`;
   return `1 set to ${f.setTargets[0] ?? 21}${f.cap ? `, cap ${f.cap}` : ''}`;
 }
+
+/**
+ * Record (or correct) one set of a match-play match and work out what the match row should hold.
+ * `setNumber` is 1-based and may replace an existing set or append the next one. Sets after a
+ * decided result are dropped (e.g. correcting Set 2 so a team wins 2–0 removes Set 3).
+ * While the match is undecided, team scores and winner stay null so it isn't treated as complete.
+ */
+export function recordSet(
+  existing: SetScore[] | null | undefined,
+  setNumber: number,
+  score: SetScore,
+  bestOf: number,
+): { set_scores: SetScore[]; result: MatchResult; team1_score: number | null; team2_score: number | null; winnerSide: 1 | 2 | null } {
+  const sets = [...(existing ?? [])].slice(0, Math.max(0, setNumber - 1));
+  sets[setNumber - 1] = { t1: score.t1, t2: score.t2 };
+  // Keep later sets only when correcting an earlier set and they are still needed.
+  for (const later of (existing ?? []).slice(setNumber)) sets.push(later);
+  const result = matchResult(sets, bestOf);
+  const kept = result.complete ? sets.slice(0, result.setsWon1 + result.setsWon2) : sets.slice(0, Math.min(sets.length, bestOf));
+  return {
+    set_scores: kept,
+    result,
+    team1_score: result.complete ? result.setsWon1 : null,
+    team2_score: result.complete ? result.setsWon2 : null,
+    winnerSide: result.winner,
+  };
+}
+
+/** Swap the perspective of recorded sets (used when the two teams flip sides/slots). */
+export function swapSets(sets: SetScore[] | null | undefined): SetScore[] {
+  return (sets ?? []).map((s) => ({ t1: s.t2, t2: s.t1 }));
+}

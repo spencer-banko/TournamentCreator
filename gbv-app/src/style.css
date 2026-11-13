@@ -217,3 +217,73 @@ body {
   background: transparent !important;
   border-top: 1px solid rgba(var(--ink-rgb), 0.1) !important;
 }
+
+/*
+ * Admin row tables (tournament list, teams list).
+ * Theme-aware: --ink-rgb is white on GT (dark UI) and navy on ECVA (light UI), so the hover
+ * tint and row action icons stay legible in both. Previously hardcoded slate colors made the
+ * row turn grey on ECVA and hid the view/edit/delete icons.
+ */
+.admin-row-table .p-datatable-table-container {
+  scrollbar-color: rgba(var(--ink-rgb), 0.35) rgba(var(--ink-rgb), 0.06);
+}
+.admin-row-table .p-datatable-thead > tr > th {
+  padding: 1rem 0.75rem 1rem 1.125rem;
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.12);
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+.admin-row-table .p-datatable-tbody > tr > td {
+  padding: 1.125rem 0.75rem 1.125rem 1.125rem;
+  vertical-align: middle;
+  border-color: rgba(var(--ink-rgb), 0.08);
+  transition: background-color 0.15s ease;
+}
+.admin-row-table .p-datatable-tbody > tr {
+  background: transparent;
+  color: inherit;
+}
+.admin-row-table .p-datatable-tbody > tr:hover > td,
+.admin-row-table .admin-row:hover {
+  background-color: rgba(var(--ink-rgb), 0.05) !important;
+}
+.admin-row-table .p-datatable-thead > tr > th:first-child,
+.admin-row-table .p-datatable-tbody > tr > td:first-child {
+  padding-left: 1.25rem;
+}
+
+.admin-row-table .dashboard-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.375rem;
+  color: var(--color-tone-400);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+/* When the row itself is hovered, lift the icons to full contrast so they never fade into the row */
+.admin-row-table .p-datatable-tbody > tr:hover .dashboard-row-action,
+.admin-row-table .admin-row:hover .dashboard-row-action {
+  color: var(--color-tone-200);
+}
+.admin-row-table .dashboard-row-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-amber-400) 55%, transparent);
+  outline-offset: 2px;
+}
+.admin-row-table .dashboard-row-action--danger:focus-visible {
+  outline-color: color-mix(in srgb, var(--color-red-400) 55%, transparent);
+}
+.admin-row-table .dashboard-row-action:hover:not(:disabled) {
+  color: var(--color-amber-400) !important;
+  background-color: color-mix(in srgb, var(--color-amber-400) 14%, transparent);
+}
+.admin-row-table .dashboard-row-action--danger:hover:not(:disabled) {
+  color: var(--color-red-500) !important;
+  background-color: color-mix(in srgb, var(--color-red-500) 14%, transparent);
+}
+.admin-row-table .dashboard-row-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

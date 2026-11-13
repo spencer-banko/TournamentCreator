@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import supabase from '../lib/supabase';
 import Button from 'primevue/button';
@@ -24,10 +23,8 @@ type RoundRow = {
 };
 
 const toast = useToast();
-const router = useRouter();
 const session = useSessionStore();
 
-const accessCode = ref<string>(session.accessCode ?? '');
 const selectedPoolSize = ref<number | null>(null);
 
 // Supported pool sizes: 3–6
@@ -102,27 +99,6 @@ function removeSit(roundNo: number, idx: number) {
   const r = rounds.value.find((x) => x.round === roundNo);
   if (!r) return;
   r.sits.splice(idx, 1);
-}
-
-async function loadTournamentByAccessCode() {
-  if (!accessCode.value?.trim()) {
-    toast.add({ severity: 'warn', summary: 'Access code required', life: 2000 });
-    return;
-  }
-  loading.value = true;
-  try {
-    await session.ensureAnon();
-    session.setAccessCode(accessCode.value.trim());
-    const t = await session.loadTournamentByCode(accessCode.value.trim());
-    if (!t) {
-      toast.add({ severity: 'error', summary: 'Tournament not found', life: 2500 });
-      return;
-    }
-    toast.add({ severity: 'success', summary: 'Tournament loaded', detail: t.name, life: 1500 });
-    if (selectedPoolSize.value) await loadTemplate();
-  } finally {
-    loading.value = false;
-  }
 }
 
 async function loadTemplate() {
@@ -234,6 +210,7 @@ watch(selectedPoolSize, async (val) => {
 });
 
 onMounted(async () => {
+  await session.restoreAdminTournament();
   if (session.tournament && selectedPoolSize.value) {
     await loadTemplate();
   }
@@ -241,7 +218,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
+  <div class="admin-tool-page text-tone-100">
     <div class="mx-auto max-w-6xl">
     <UiSectionHeading
       variant="dashboard"
@@ -249,43 +226,7 @@ onMounted(async () => {
       subtitle="Define round-by-round templates per pool size using pickers."
       :divider="true"
     >
-      <Button
-        label="Back"
-        icon="pi pi-arrow-left"
-        severity="secondary"
-        outlined
-        class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
-        @click="router.push({ name: 'admin-dashboard' })"
-      />
     </UiSectionHeading>
-
-    <!-- Tournament loader -->
-    <div class="mt-2 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
-        <div class="sm:col-span-2">
-          <label class="mb-2 block text-sm font-medium text-tone-300">Tournament Access Code</label>
-          <input
-            v-model="accessCode"
-            placeholder="e.g. GOJACKETS2025"
-            class="w-full rounded-xl border border-slate-500/50 bg-white px-4 py-3 text-slate-900"
-          />
-        </div>
-        <div class="flex">
-          <Button
-            :loading="loading"
-            label="Load Tournament"
-            icon="pi pi-search"
-            :class="adminBtnBluePillClass"
-            :pt="adminBtnPillPt"
-            @click="loadTournamentByAccessCode"
-          />
-        </div>
-      </div>
-      <div v-else class="text-sm text-tone-300">
-        Loaded: <span class="font-semibold text-ink">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-tone-400">({{ session.accessCode }})</span>
-      </div>
-    </div>
 
     <!-- Pool size & helper note -->
     <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">

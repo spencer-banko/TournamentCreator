@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { useConfirmAsync } from '../lib/useConfirmAsync';
 import InputText from 'primevue/inputtext';
@@ -8,6 +7,7 @@ import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
 import supabase from '../lib/supabase';
 import { useSessionStore } from '../stores/session';
+import { useAdminProgressStore } from '../stores/adminProgress';
 import UiSectionHeading from '@/components/ui/UiSectionHeading.vue';
 import UiAccordion from '@/components/ui/UiAccordion.vue';
 import { parseCsv, normalizeHeader, objectsToCsv, normalizeCell } from '../lib/csv';
@@ -33,12 +33,11 @@ type Team = {
   seed_global: number | null;
 };
 
-const router = useRouter();
 const toast = useToast();
 const askConfirm = useConfirmAsync();
 const session = useSessionStore();
+const progress = useAdminProgressStore();
 
-const accessCode = ref<string>(session.accessCode ?? '');
 const loading = ref(false);
 const saving = ref(false);
 const generating = ref(false);
@@ -154,30 +153,8 @@ const poolsMissingSeeds = computed(() => {
 });
 
 // Loaders
-async function loadTournamentByAccessCode() {
-  if (!accessCode.value?.trim()) {
-    toast.add({ severity: 'warn', summary: 'Access code required', life: 2000 });
-    return;
-  }
-  loading.value = true;
-  try {
-    await session.ensureAnon();
-    session.setAccessCode(accessCode.value.trim());
-    const t = await session.loadTournamentByCode(accessCode.value.trim());
-    if (!t) {
-      toast.add({ severity: 'error', summary: 'Tournament not found', life: 2500 });
-      pools.value = [];
-      teams.value = [];
-      return;
-    }
-    toast.add({ severity: 'success', summary: 'Tournament loaded', detail: t.name, life: 1500 });
-    await Promise.all([loadPools(), loadTeams()]);
-  } finally {
-    loading.value = false;
-  }
-}
-
 async function loadPools() {
+  void progress.refresh(); // keep sidebar step statuses current
   if (!session.tournament) return;
   const { data, error } = await supabase
     .from('pools')
@@ -200,6 +177,7 @@ async function loadPools() {
 }
 
 async function loadTeams() {
+  void progress.refresh(); // keep sidebar step statuses current
   if (!session.tournament) return;
   const { data, error } = await supabase
     .from('teams')
@@ -686,36 +664,14 @@ async function applyPoolsImport() {
 }
  
 onMounted(async () => {
+  // AdminLayout has already resolved the active tournament.
+  await session.restoreAdminTournament();
+  if (!session.tournament) return;
+  loading.value = true;
   try {
-    await session.ensureAnon();
-    session.initFromStorage();
-
-    // If a tournament is already loaded, fetch data
-    if (session.tournament) {
-      loading.value = true;
-      try {
-        await Promise.all([loadPools(), loadTeams()]);
-      } finally {
-        loading.value = false;
-      }
-      return;
-    }
-
-    // Attempt to restore by stored access code
-    if (session.accessCode) {
-      loading.value = true;
-      try {
-        const t = await session.loadTournamentByCode(session.accessCode);
-        if (t) {
-          await Promise.all([loadPools(), loadTeams()]);
-          toast.add({ severity: 'info', summary: 'Tournament restored', detail: t.name, life: 1200 });
-        }
-      } finally {
-        loading.value = false;
-      }
-    }
-  } catch {
-    // ignore restore errors; user can load via access code
+    await Promise.all([loadPools(), loadTeams()]);
+  } finally {
+    loading.value = false;
   }
 });
  
@@ -1061,7 +1017,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
 </script>
 
 <template>
-  <div class="admin-tool-page -mx-4 min-h-dvh gbv-page-bg px-4 py-8 text-tone-100">
+  <div class="admin-tool-page text-tone-100">
     <div class="mx-auto max-w-7xl">
     <UiSectionHeading
       variant="dashboard"
@@ -1069,44 +1025,7 @@ async function hasExistingPoolMatches(tournamentId: string): Promise<boolean> {
       subtitle="Create pools, assign teams using Move, and set unique seeds per pool."
       :divider="true"
     >
-        <Button
-          label="Back"
-          icon="pi pi-arrow-left"
-          severity="secondary"
-          outlined
-          class="!rounded-xl !border-tone-600/70 !text-tone-200 hover:!border-amber-500/35 hover:!bg-tone-800/80 hover:!text-amber-100"
-          @click="router.push({ name: 'admin-dashboard' })"
-        />
     </UiSectionHeading>
-
-    <!-- Tournament loader -->
-    <div class="mt-2 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" v-if="!session.tournament">
-        <div class="sm:col-span-2">
-          <label class="mb-2 block text-sm font-medium text-tone-300">Tournament Access Code</label>
-          <InputText
-            v-model="accessCode"
-            placeholder="e.g. GOJACKETS2025"
-            class="w-full !rounded-xl !px-4 !py-3 !bg-white !text-slate-900"
-          />
-        </div>
-        <div class="flex">
-          <Button
-            :loading="loading"
-            label="Load Tournament"
-            icon="pi pi-search"
-            :class="adminBtnBluePillClass"
-            :pt="adminBtnPillPt"
-            @click="loadTournamentByAccessCode"
-          />
-        </div>
-      </div>
-      <div v-else class="text-sm text-tone-300">
-        Loaded:
-        <span class="font-semibold text-ink">{{ session.tournament.name }}</span>
-        <span class="ml-2 text-tone-400">({{ session.accessCode }})</span>
-      </div>
-    </div>
 
     <!-- Autogenerate Pools -->
     <div v-if="session.tournament" class="mt-4 rounded-xl border border-tone-600/45 bg-tone-800/50 p-4 shadow-lg shadow-black/20">

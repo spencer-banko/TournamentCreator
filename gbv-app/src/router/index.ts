@@ -81,52 +81,22 @@ const routes: RouteRecordRaw[] = [
     meta: { blueLayout: true, fullScreen: true },
   },
   {
+    // Every admin page shares one shell: header + tournament switcher + step sidebar + Prev/Next.
+    // Child routes inherit this meta (requiresAdmin, and App.vue hides its own header/footer).
     path: '/admin',
-    name: 'admin-dashboard',
-    component: () => import('../pages/AdminDashboard.vue'),
+    component: () => import('../components/admin/AdminLayout.vue'),
     meta: { requiresAdmin: true, blueLayout: true, adminDashboardLayout: true },
-  },
-  {
-    path: '/admin/schedule-templates',
-    name: 'admin-schedule-templates',
-    component: () => import('../pages/AdminScheduleTemplates.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
-  },
-  {
-    path: '/admin/tournament-setup',
-    name: 'admin-tournament-setup',
-    component: () => import('../pages/AdminTournamentSetup.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
-  },
-  {
-    path: '/admin/players-import',
-    name: 'admin-players-import',
-    component: () => import('../pages/AdminPlayersImport.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
-  },
-  {
-    path: '/admin/pools-seeds',
-    name: 'admin-pools-seeds',
-    component: () => import('../pages/AdminPoolsSeeds.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
-  },
-  {
-    path: '/admin/generate-schedule',
-    name: 'admin-generate-schedule',
-    component: () => import('../pages/AdminGenerateSchedule.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
-  },
-  {
-    path: '/admin/pool-matches',
-    name: 'admin-pool-matches',
-    component: () => import('../pages/AdminPoolMatches.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
-  },
-  {
-    path: '/admin/bracket',
-    name: 'admin-bracket',
-    component: () => import('../pages/AdminBracket.vue'),
-    meta: { requiresAdmin: true, blueLayout: true },
+    children: [
+      { path: '', name: 'admin-dashboard', component: () => import('../pages/AdminDashboard.vue') },
+      { path: 'tournament-setup', name: 'admin-tournament-setup', component: () => import('../pages/AdminTournamentSetup.vue') },
+      { path: 'players-import', name: 'admin-players-import', component: () => import('../pages/AdminPlayersImport.vue') },
+      { path: 'pools-seeds', name: 'admin-pools-seeds', component: () => import('../pages/AdminPoolsSeeds.vue') },
+      // Merged into the Pool Schedule page; keep old links/bookmarks working.
+      { path: 'generate-schedule', name: 'admin-generate-schedule', redirect: { name: 'admin-pool-matches' } },
+      { path: 'pool-matches', name: 'admin-pool-matches', component: () => import('../pages/AdminPoolMatches.vue') },
+      { path: 'bracket', name: 'admin-bracket', component: () => import('../pages/AdminBracket.vue') },
+      { path: 'schedule-templates', name: 'admin-schedule-templates', component: () => import('../pages/AdminScheduleTemplates.vue') },
+    ],
   },
 
   // Fallback

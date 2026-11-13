@@ -8,6 +8,7 @@ import { useSessionStore } from '../stores/session';
 import PublicLayout from '../components/layout/PublicLayout.vue';
 import UiBackButton from '../components/ui/UiBackButton.vue';
 import { matchContext } from '../lib/matchContext';
+import { formatFromMatch, matchResult, targetForSet } from '../lib/scoring';
 
 type UUID = string;
 
@@ -182,13 +183,76 @@ function finalScoreText(m: Match): string | null {
 
 const canEditScore = computed(() => !!match.value?.team1_id && !!match.value?.team2_id);
 
-function goManual() {
+// ---------- Match play: per-set choices ----------
+
+const isMatchPlay = computed(() => (match.value?.best_of ?? 1) > 1);
+const recordedSets = computed(() => (Array.isArray(match.value?.set_scores) ? match.value!.set_scores! : []));
+const setResult = computed(() => matchResult(recordedSets.value, match.value?.best_of ?? 1));
+/** Set currently being live scored (the next unrecorded set). */
+const liveSetNumber = computed(() => recordedSets.value.length + 1);
+
+type SetRow = {
+  n: number;
+  target: number;
+  score: { t1: number; t2: number } | null;
+  state: 'done' | 'next' | 'locked' | 'not-needed';
+  note: string;
+};
+
+const setRows = computed<SetRow[]>(() => {
+  const m = match.value;
+  if (!m || !isMatchPlay.value) return [];
+  const fmt = formatFromMatch(m);
+  const res = setResult.value;
+  const rows: SetRow[] = [];
+  for (let n = 1; n <= fmt.bestOf; n++) {
+    const score = recordedSets.value[n - 1] ?? null;
+    let state: SetRow['state'];
+    let note = '';
+    if (score) {
+      state = 'done';
+      const w = score.t1 > score.t2 ? m.team1_id : m.team2_id;
+      note = `${nameFor(w)} won`;
+    } else if (res.complete) {
+      state = 'not-needed';
+      note = 'Not needed';
+    } else if (n === recordedSets.value.length + 1) {
+      state = 'next';
+      note = isLiveActive(m) ? 'Live now' : 'Up next';
+    } else {
+      state = 'locked';
+      note = n === 3 ? 'Only played if sets are 1–1' : `Finish Set ${n - 1} first`;
+    }
+    rows.push({ n, target: targetForSet(fmt, n), score, state, note });
+  }
+  return rows;
+});
+
+const selectedSet = ref<number | null>(null);
+function selectSet(row: SetRow) {
+  if (row.state === 'locked' || row.state === 'not-needed') return;
+  selectedSet.value = selectedSet.value === row.n ? null : row.n;
+}
+
+const matchWinnerText = computed(() => {
+  const m = match.value;
+  if (!m || !isMatchPlay.value || !isCompleted(m)) return '';
+  const r = setResult.value;
+  const name = winnerName(m);
+  if (!name) return '';
+  return `${name} wins the match ${Math.max(r.setsWon1, r.setsWon2)}–${Math.min(r.setsWon1, r.setsWon2)}`;
+});
+
+function goManual(setNumber?: number) {
   if (!match.value) return;
   if (!canEditScore.value) {
     toast.add({ severity: 'warn', summary: 'Teams not set', detail: 'Cannot enter a score until both teams are assigned.', life: 2200 });
     return;
   }
-  router.push({ name: 'match-score', params: { accessCode: accessCode.value, matchId: match.value.id }, query: from.value ? { from: from.value } : undefined });
+  const query: Record<string, string> = {};
+  if (from.value) query.from = from.value;
+  if (setNumber) query.set = String(setNumber);
+  router.push({ name: 'match-score', params: { accessCode: accessCode.value, matchId: match.value.id }, query });
 }
 
 function goLive() {
@@ -296,7 +360,7 @@ onBeforeUnmount(() => {
           class="mt-5 rounded-2xl bg-ink/10 p-4 text-ink ring-2 ring-red-500/60"
         >
           <div class="flex items-center justify-between gap-3">
-            <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">Live Score</div>
+            <div class="text-sm font-semibold uppercase tracking-wide text-ink/80">Live Score<template v-if="isMatchPlay"> · Set {{ liveSetNumber }}</template></div>
             <div class="inline-flex items-center gap-2 rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white whitespace-nowrap">
               <span class="size-2 rounded-full bg-white/90"></span>
               LIVE <span class="tabular-nums">{{ match.live_score_team1 ?? 0 }}-{{ match.live_score_team2 ?? 0 }}</span>
@@ -356,19 +420,88 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="mt-6 grid grid-cols-1 gap-4" :class="(match.best_of ?? 1) > 1 ? '' : 'sm:grid-cols-2'">
+        <!-- Match play: pick a set, then choose how to score it -->
+        <div v-if="isMatchPlay" class="mt-6">
+          <div
+            v-if="matchWinnerText"
+            class="mb-4 flex items-center gap-3 rounded-2xl bg-yellow-400 px-4 py-3 text-slate-900 shadow-lg"
+            role="status"
+          >
+            <i class="pi pi-trophy text-2xl" aria-hidden="true" />
+            <div class="text-lg font-black leading-tight">{{ matchWinnerText }}</div>
+          </div>
+          <div v-else class="mb-3 flex items-center justify-between text-sm text-ink/80">
+            <span>Best of 3 — choose a set</span>
+            <span v-if="setResult.setsWon1 + setResult.setsWon2 > 0" class="font-semibold tabular-nums text-ink">
+              Sets {{ setResult.setsWon1 }}–{{ setResult.setsWon2 }}
+            </span>
+          </div>
+
+          <div class="grid gap-3">
+            <div
+              v-for="row in setRows"
+              :key="row.n"
+              class="rounded-2xl ring-1 transition"
+              :class="[
+                row.state === 'locked' || row.state === 'not-needed' ? 'bg-ink/5 ring-ink/10 opacity-60' : 'bg-ink/10 ring-ink/20',
+                selectedSet === row.n ? 'ring-2 ring-amber-400' : '',
+                row.state === 'next' && isLiveActive(match) ? 'ring-2 ring-red-500/60' : '',
+              ]"
+            >
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 px-4 py-4 text-left"
+                :class="row.state === 'locked' || row.state === 'not-needed' ? 'cursor-not-allowed' : 'cursor-pointer'"
+                :disabled="row.state === 'locked' || row.state === 'not-needed' || !canEditScore"
+                :aria-expanded="selectedSet === row.n"
+                @click="selectSet(row)"
+              >
+                <div class="min-w-0 flex-1">
+                  <div class="text-lg font-semibold text-ink">Set {{ row.n }} <span class="text-sm font-normal text-ink/70">to {{ row.target }}</span></div>
+                  <div class="text-sm" :class="row.state === 'next' && isLiveActive(match) ? 'font-semibold text-red-500' : 'text-ink/70'">{{ row.note }}</div>
+                </div>
+                <div v-if="row.score" class="shrink-0 text-2xl font-black tabular-nums text-ink">{{ row.score.t1 }}–{{ row.score.t2 }}</div>
+                <div v-else-if="row.state === 'next' && isLiveActive(match)" class="shrink-0 text-2xl font-black tabular-nums text-ink">
+                  {{ match.live_score_team1 ?? 0 }}–{{ match.live_score_team2 ?? 0 }}
+                </div>
+                <i v-if="row.state === 'locked' || row.state === 'not-needed'" class="pi pi-lock shrink-0 text-ink/50" aria-hidden="true" />
+                <i v-else class="pi shrink-0 text-ink/60" :class="selectedSet === row.n ? 'pi-chevron-up' : 'pi-chevron-down'" aria-hidden="true" />
+              </button>
+
+              <div v-if="selectedSet === row.n" class="grid grid-cols-1 gap-3 px-4 pb-4 sm:grid-cols-2">
+                <Button
+                  :label="row.state === 'done' ? 'Edit Set Score' : 'Enter Final Score'"
+                  icon="pi pi-pencil"
+                  severity="secondary"
+                  size="large"
+                  class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
+                  @click="goManual(row.n)"
+                />
+                <Button
+                  v-if="row.state === 'next'"
+                  :label="isLiveActive(match) ? 'View Live Score' : 'Use Live Scoreboard'"
+                  icon="pi pi-bolt"
+                  severity="secondary"
+                  size="large"
+                  class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
+                  @click="goLive"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Button
-            :label="(match.best_of ?? 1) > 1 ? 'Enter Set Scores' : 'Enter Final Score'"
+            label="Enter Final Score"
             icon="pi pi-pencil"
             :disabled="!canEditScore"
             severity="secondary"
             size="large"
             class="!rounded-2xl !px-6 !py-4 !text-lg !font-semibold text-ink bg-ink/10 ring-1 ring-ink/20"
-            @click="goManual"
+            @click="goManual()"
           />
-          <!-- The live scoreboard tracks a single set, so it is offered only for 1-set matches. -->
           <Button
-            v-if="(match.best_of ?? 1) <= 1"
             :label="isLiveActive(match) ? 'View Live Score' : 'Use Live Scoreboard'"
             icon="pi pi-bolt"
             :disabled="!canEditScore"
