@@ -148,7 +148,7 @@ async function saveCode() {
           <h1 class="text-3xl font-extrabold tracking-tight text-ink drop-shadow-md sm:text-4xl">
             Enter the tournament code to continue.
           </h1>
-          <p class="mt-3 text-base text-tone-400 sm:text-lg">Pool play, bracket, and live scores — one code away.</p>
+          <p class="mt-3 text-base text-tone-400 sm:text-lg">Pool play, bracket, and live scores.</p>
         </div>
 
         <div
