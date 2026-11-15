@@ -4,6 +4,16 @@ import { parseTeamList, mergeSeeds, moveItem } from '../teamImport';
 const names = (r: ReturnType<typeof parseTeamList>) => r.importable.map((t) => [t.name, t.seed]);
 
 describe('parseTeamList', () => {
+  it('splits a typed ", seed" line mixed into a spreadsheet paste', () => {
+    const r = parseTeamList('Team Name\tSeed\nBravo / Brown\t2\nDelta / Diaz, 4\nalpha / anders, 6\nSmith, J / Lima', ['Alpha / Anders']);
+    expect(r.rows.map((x) => [x.name, x.seed, x.status])).toEqual([
+      ['Bravo / Brown', 2, 'new'],
+      ['Delta / Diaz', 4, 'new'],
+      ['alpha / anders', 6, 'exists'],
+      ['Smith, J / Lima', null, 'new'],
+    ]);
+  });
+
   it('parses one team per line', () => {
     const r = parseTeamList('Alice / Bob\nCara / Dee\n\n  Eve / Fay  \n');
     expect(names(r)).toEqual([

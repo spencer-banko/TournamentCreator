@@ -288,6 +288,13 @@ function validateForm() {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(form.value.date.trim())) {
     throw new Error('Date must be YYYY-MM-DD');
   }
+  {
+    const [y, m, d] = form.value.date.trim().split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+      throw new Error(`${form.value.date.trim()} is not a real date`);
+    }
+  }
   if (!form.value.access_code.trim()) throw new Error('Access code is required');
 
   // Advancement rules sanity
@@ -415,8 +422,10 @@ async function saveTournament() {
         }
 
         // A newly created tournament becomes the one you're working on, so the steps unlock.
-        session.setAdminActiveTournament(data as Tournament);
+        // Set ?edit= first: activating remounts this page (keyed by tournament), and the
+        // remounted page opens the tournament named in the query.
         await router.replace({ name: 'admin-tournament-setup', query: { edit: newId } });
+        session.setAdminActiveTournament(data as Tournament);
         return;
       }
     }
@@ -428,7 +437,10 @@ async function saveTournament() {
     }
   } catch (err: any) {
     const hint = [err?.code, err?.details, err?.hint].filter(Boolean).join(' — ');
-    const detail = hint ? `${err?.message ?? 'Unknown error'} (${hint})` : (err?.message ?? 'Unknown error');
+    let detail = hint ? `${err?.message ?? 'Unknown error'} (${hint})` : (err?.message ?? 'Unknown error');
+    if (err?.code === '23505' && String(err?.message ?? '').includes('access_code')) {
+      detail = `Access code "${payload.access_code}" is already used by another tournament. Pick a different one.`;
+    }
     toast.add({ severity: 'error', summary: 'Save failed', detail, life: 6000 });
     console.error('[AdminTournamentSetup] saveTournament', err);
   } finally {

@@ -917,14 +917,14 @@ async function autogeneratePools() {
     let idx = 0;
     const P = createdOrdered.length;
 
-    // Helper to advance idx in snake pattern
+    // Advance idx in a serpentine: 1,2,3,3,2,1,1,2,3,… (the end pool takes two in a row).
     function advance() {
       if (P === 1) return;
       if (dir === 1) {
-        if (idx >= P - 1) { dir = -1; idx = P - 2; }
+        if (idx >= P - 1) dir = -1;
         else idx += 1;
       } else {
-        if (idx <= 0) { dir = 1; idx = 1; }
+        if (idx <= 0) dir = 1;
         else idx -= 1;
       }
     }

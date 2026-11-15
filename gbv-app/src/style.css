@@ -287,3 +287,9 @@ body {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Disabled PrimeVue buttons must look disabled (custom pill classes otherwise keep full color). */
+.p-button:disabled:not(.p-button-loading) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

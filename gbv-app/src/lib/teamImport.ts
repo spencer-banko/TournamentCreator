@@ -49,7 +49,13 @@ function parseSeed(raw: string): number | null | 'invalid' {
 function splitRows(text: string): { rows: string[][]; sep: string } {
   const clean = text.replace(/^﻿/, '');
   if (clean.includes('\t')) {
-    const rows = clean.split(/\r?\n/).map((l) => l.split('\t'));
+    // Pasted from a spreadsheet. A hand-typed line mixed in ("Delta / Diaz, 4") has no
+    // tab; split off a trailing ", <seed>" there but keep other commas in the name.
+    const rows = clean.split(/\r?\n/).map((l) => {
+      if (l.includes('\t')) return l.split('\t');
+      const m = /^(.*?)\s*,\s*(#?\d+)\s*$/.exec(l);
+      return m ? [m[1]!, m[2]!] : [l];
+    });
     return { rows, sep: ' / ' };
   }
   return { rows: parseCsv(clean), sep: ', ' };

@@ -44,6 +44,18 @@ const editOpen = ref(false);
 const tournament = computed<Tournament | null>(() => session.tournament as Tournament | null);
 const nameOf = computed(() => new Map(teams.value.map((t) => [t.id, t.full_team_name])));
 
+/** Teams booked more than once (playing or reffing) in the same round — usually after a drag. */
+function roundConflicts(ms: Match[]): string[] {
+  if (ms.length < 2) return [];
+  const count = new Map<string, number>();
+  for (const m of ms) {
+    for (const id of [m.team1_id, m.team2_id, m.ref_team_id]) {
+      if (id) count.set(id, (count.get(id) ?? 0) + 1);
+    }
+  }
+  return [...count.entries()].filter(([, n]) => n > 1).map(([id]) => nameOf.value.get(id) ?? 'A team');
+}
+
 const poolBlocks = computed(() =>
   pools.value
     .filter((p) => filterPool.value === 'all' || p.id === filterPool.value)
@@ -53,6 +65,9 @@ const poolBlocks = computed(() =>
         .filter((m) => m.pool_id === p.id)
         .sort((a, b) => (a.round_number ?? 0) - (b.round_number ?? 0) || a.id.localeCompare(b.id));
       const rounds = new Map<number, Match[]>();
+      // Keep emptied rounds (e.g. after dragging a round's only match away) as drop targets.
+      const maxRound = Math.max(0, ...pMatches.map((m) => m.round_number ?? 0));
+      for (let r = 1; r <= maxRound; r++) rounds.set(r, []);
       for (const m of pMatches) {
         const r = m.round_number ?? 0;
         rounds.set(r, [...(rounds.get(r) ?? []), m]);
@@ -63,7 +78,9 @@ const poolBlocks = computed(() =>
         pool: p,
         teams: pTeams,
         format: formatLabel(poolFormatForSize(tournament.value?.game_rules, pTeams.length)),
-        rounds: [...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([round, ms]) => ({ round, matches: ms })),
+        rounds: [...rounds.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([round, ms]) => ({ round, matches: ms, conflicts: roundConflicts(ms) })),
         nextRound: Math.max(0, ...pMatches.map((m) => m.round_number ?? 0)) + 1,
         standings,
         scored,
@@ -434,6 +451,7 @@ onMounted(async () => {
               icon="pi pi-cog"
               :loading="generating"
               :disabled="checking || prereqErrors.length > 0"
+              :title="prereqErrors.length ? 'Fix the issues listed here first' : undefined"
               :class="adminBtnGreenPillClass"
               :pt="adminBtnPillPt"
               @click="runGenerate"
@@ -508,6 +526,19 @@ onMounted(async () => {
             @drop.prevent="onDrop(b.pool.id, r.round)"
           >
             <div class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-tone-400">Round {{ r.round || '–' }}</div>
+            <div
+              v-if="r.conflicts.length"
+              class="mb-1 flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-ink"
+            >
+              <i class="pi pi-exclamation-triangle mt-0.5 text-amber-500" aria-hidden="true" />
+              <span>Booked twice this round: {{ r.conflicts.join(', ') }}</span>
+            </div>
+            <div
+              v-if="!r.matches.length"
+              class="rounded-xl border border-dashed border-tone-600/50 px-3 py-2 text-xs text-tone-400"
+            >
+              No matches — drag one here
+            </div>
             <div
               v-for="m in r.matches"
               :key="m.id"

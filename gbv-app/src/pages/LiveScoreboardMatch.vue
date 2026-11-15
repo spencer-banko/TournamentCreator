@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useConfirmAsync } from '../lib/useConfirmAsync';
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import Button from 'primevue/button';
@@ -521,6 +522,7 @@ const winnerId = computed<UUID | null>(() => {
   return s1 > s2 ? team1Id.value : team2Id.value;
 });
 
+const askConfirm = useConfirmAsync();
 const finalPromptKey = ref<string | null>(null);
 watch(
   () => [canControl.value, hasWinner.value, score1.value, score2.value, team1Id.value, team2Id.value] as const,
@@ -536,9 +538,18 @@ watch(
 
     const winTeamId = winnerId.value;
     const winTeam = nameFor(winTeamId);
-    const ok = isMatchPlay.value
-      ? confirm(`Submit Set ${currentSet.value}?\n\n${nameFor(team1Id.value)} ${s1} – ${s2} ${nameFor(team2Id.value)}\nSet winner: ${winTeam}`)
-      : confirm(`Submit final score?\n\n${nameFor(team1Id.value)} ${s1} – ${s2} ${nameFor(team2Id.value)}\nWinner: ${winTeam}`);
+    // Themed dialog, not window.confirm(): a native dialog blocks the page (and realtime updates).
+    const line = `${nameFor(team1Id.value)} ${s1} – ${s2} ${nameFor(team2Id.value)}.`;
+    const ok = await askConfirm(
+      isMatchPlay.value ? `${line} Set winner: ${winTeam}.` : `${line} Winner: ${winTeam}.`,
+      {
+        header: isMatchPlay.value ? `Submit Set ${currentSet.value}?` : 'Submit final score?',
+        acceptLabel: 'Submit',
+        danger: false,
+      },
+    );
+    // Scores may have changed while the dialog was open (e.g. an undo); only submit what was confirmed.
+    if (ok && (score1.value !== s1 || score2.value !== s2)) return;
     if (ok) {
       await submitFinal();
     }
@@ -923,6 +934,7 @@ onBeforeUnmount(async () => {
                 icon="pi pi-check-circle"
                 class="!rounded-2xl !px-6 !py-3 !text-base !font-semibold border-none text-white gbv-grad-blue"
                 :disabled="!hasWinner"
+                :title="hasWinner ? undefined : 'Available once a team has won the set (reached the target and leads by 2)'"
                 @click="submitFinal"
               />
               <Button

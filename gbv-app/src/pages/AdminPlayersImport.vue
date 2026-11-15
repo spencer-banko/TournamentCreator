@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { useConfirmAsync } from '../lib/useConfirmAsync';
 import InputText from 'primevue/inputtext';
@@ -74,6 +74,15 @@ async function loadTeams() {
 
 /** True when the on-screen order differs from the seeds stored in the DB (incl. gaps). */
 const seedsDirty = computed(() => order.value.some((t, i) => t.seed_global !== i + 1));
+// Don't silently drop a reordered-but-unsaved seed list when leaving the page.
+
+onBeforeRouteLeave(async () => {
+  if (!seedsDirty.value || !order.value.length) return true;
+  return askConfirm('Your new seed order hasn\'t been saved. Leave and discard it?', {
+    header: 'Unsaved seed order',
+    acceptLabel: 'Discard changes',
+  });
+});
 const hasPools = computed(() => teams.value.some((t) => t.pool_id));
 
 function onRowReorder(e: DataTableRowReorderEvent) {
@@ -273,6 +282,11 @@ async function applyEdit() {
   const name = normalizeCell(editTeamName.value);
   if (!name) {
     toast.add({ severity: 'warn', summary: 'Team name required', life: 2000 });
+    return;
+  }
+  const editingId = selectedTeam.value.id;
+  if (teams.value.some((t) => t.id !== editingId && normalizeCell(t.full_team_name).toLowerCase() === name.toLowerCase())) {
+    toast.add({ severity: 'warn', summary: 'Duplicate team name', detail: `Another team is already called "${name}".`, life: 3000 });
     return;
   }
 
