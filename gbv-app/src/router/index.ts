@@ -122,7 +122,7 @@ router.beforeEach(async (to) => {
     try {
       const { useSessionStore } = await import('../stores/session');
       const store = useSessionStore();
-      await store.refreshAdminUser();
+      await store.refreshAdminUser(() => router.replace({ name: 'admin-login' }));
       if (!store.isAdminAuthenticated) {
         return { name: 'admin-login' };
       }

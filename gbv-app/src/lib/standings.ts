@@ -169,6 +169,48 @@ export function seedSlotsForSize(B: number): number[] {
   return res;
 }
 
+/**
+ * Place seeded teams into bracket slots (standard order, byes to top seeds), then swap
+ * lower seeds with their nearest neighbours so no first-round match is a same-pool rematch.
+ * Top seeds stay put; a swap is only taken when it fixes the clash without creating a new one.
+ * Returns one entry per slot (null = bye).
+ */
+export function placeSeedsAvoidingPoolRematches<T extends { poolId: string | null }>(seeds: T[], B: number): (T | null)[] {
+  const order = seedSlotsForSize(B);
+  const N = seeds.length;
+  const list = seeds.slice();
+  // Slot index of each seed number, and its first-round opponent seed (null for a bye).
+  const slotOf = new Map(order.map((seed, i) => [seed, i]));
+  const opp = (seed: number): number | null => {
+    const o = order[slotOf.get(seed)! ^ 1];
+    return o <= N ? o : null;
+  };
+  const clash = (a: number, b: number | null) =>
+    b != null && list[a - 1].poolId != null && list[a - 1].poolId === list[b - 1].poolId;
+  // Movable seeds: the lower-seeded side of a real first-round match.
+  const movable = Array.from({ length: N }, (_, i) => i + 1).filter((s) => {
+    const o = opp(s);
+    return o != null && o < s;
+  });
+
+  for (let guard = 0; guard < N * N; guard++) {
+    const t = movable.find((s) => clash(s, opp(s)));
+    if (t == null) break;
+    const candidates = movable.filter((u) => u !== t).sort((a, b) => Math.abs(a - t) - Math.abs(b - t) || a - b);
+    let fixed = false;
+    for (const u of candidates) {
+      [list[t - 1], list[u - 1]] = [list[u - 1], list[t - 1]];
+      if (!clash(t, opp(t)) && !clash(u, opp(u))) {
+        fixed = true;
+        break;
+      }
+      [list[t - 1], list[u - 1]] = [list[u - 1], list[t - 1]];
+    }
+    if (!fixed) break; // unavoidable (e.g. most teams from one pool); keep record order
+  }
+  return order.map((seed) => (seed <= N ? list[seed - 1] : null));
+}
+
 /** Name of a bracket round given total rounds, e.g. 4 rounds: R1 = "Round of 16", R4 = "Final". */
 export function roundName(round: number, totalRounds: number): string {
   const fromEnd = totalRounds - round + 1;

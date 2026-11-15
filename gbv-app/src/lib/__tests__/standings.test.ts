@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rankAllPools, seedForPlaces, bracketSizeFor, seedSlotsForSize, roundName, type StandingTeam, type StandingMatch } from '../standings';
+import { rankAllPools, seedForPlaces, bracketSizeFor, seedSlotsForSize, placeSeedsAvoidingPoolRematches, roundName, type StandingTeam, type StandingMatch } from '../standings';
 
 /** Build a pool of n teams named <prefix>1..n where a lower number always wins 21-(10+gap). */
 function pool(prefix: string, n: number): { teams: StandingTeam[]; matches: StandingMatch[] } {
@@ -78,5 +78,35 @@ describe('bracket shape', () => {
     expect(roundName(3, 4)).toBe('Semifinals');
     expect(roundName(2, 4)).toBe('Quarterfinals');
     expect(roundName(1, 4)).toBe('Round of 16');
+  });
+});
+
+describe('placeSeedsAvoidingPoolRematches', () => {
+  const t = (id: string, poolId: string) => ({ id, poolId });
+  const pairs = (slots: Array<{ id: string; poolId: string } | null>) =>
+    Array.from({ length: slots.length / 2 }, (_, i) => [slots[2 * i]?.id ?? null, slots[2 * i + 1]?.id ?? null]);
+
+  it('swaps lower seeds so first-round opponents come from different pools', () => {
+    // 6 teams, 8 slots: seeds 1-2 get byes; by record 3 v 6 would both be pool B.
+    const seeds = [t('D', 'A'), t('Br', 'B'), t('E', 'B'), t('C', 'C'), t('H', 'C'), t('G', 'B')];
+    const slots = placeSeedsAvoidingPoolRematches(seeds, 8);
+    for (const [a, b] of pairs(slots)) {
+      if (!a || !b) continue;
+      const pa = seeds.find((s) => s.id === a)!.poolId;
+      const pb = seeds.find((s) => s.id === b)!.poolId;
+      expect(pa).not.toBe(pb);
+    }
+    // Byes still go to the top two seeds.
+    expect(pairs(slots).filter(([, b]) => b === null).map(([a]) => a).sort()).toEqual(['Br', 'D']);
+  });
+
+  it('leaves the bracket unchanged when there is no clash', () => {
+    const seeds = [t('1', 'A'), t('2', 'B'), t('3', 'A'), t('4', 'B')];
+    expect(placeSeedsAvoidingPoolRematches(seeds, 4).map((s) => s?.id)).toEqual(['1', '4', '2', '3']);
+  });
+
+  it('keeps record order when a clash is unavoidable', () => {
+    const seeds = [t('1', 'A'), t('2', 'A')];
+    expect(placeSeedsAvoidingPoolRematches(seeds, 2).map((s) => s?.id)).toEqual(['1', '2']);
   });
 });

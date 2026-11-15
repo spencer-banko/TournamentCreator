@@ -1,6 +1,6 @@
 import supabase from './supabase';
 import type { AdvancementRules, Tournament, Bracket, BracketRoundFormat, MatchFormat } from '../types/db';
-import { rankAllPools, seedForPlaces, bracketSizeFor, seedSlotsForSize, DEFAULT_TIEBREAKERS, type Standing, type Tiebreaker } from './standings';
+import { rankAllPools, seedForPlaces, bracketSizeFor, placeSeedsAvoidingPoolRematches, DEFAULT_TIEBREAKERS, type Standing, type Tiebreaker } from './standings';
 import { normalizeFormat, DEFAULT_SINGLE_SET, DEFAULT_MATCH_PLAY } from './scoring';
 
 /**
@@ -162,8 +162,8 @@ export async function generateBracket(tournamentId: string, bracketId: string): 
   const bracket = brackets.find((b) => b.id === bracketId);
   if (!bracket) return { inserted: 0, bracketSize: 0, rounds: 0, teams: 0, errors: ['Bracket not found.'] };
 
-  const seeds = (await seedBracket(tournamentId, bracket)).map((s) => s.teamId);
-  const N = seeds.length;
+  const seeded = await seedBracket(tournamentId, bracket);
+  const N = seeded.length;
   if (N < 2) {
     return { inserted: 0, bracketSize: 0, rounds: 0, teams: N, errors: [`${bracket.name}: needs at least 2 teams (check which pool places feed it).`] };
   }
@@ -175,7 +175,7 @@ export async function generateBracket(tournamentId: string, bracketId: string): 
   const { error: delErr } = await supabase.from('matches').delete().eq('tournament_id', tournamentId).eq('bracket_id', bracketId);
   if (delErr) return { inserted: 0, bracketSize: B, rounds, teams: N, errors: [`Failed to clear ${bracket.name}: ${delErr.message}`] };
 
-  const slots = seedSlotsForSize(B).map((seedNum) => (seedNum <= N ? seeds[seedNum - 1] : null));
+  const slots = placeSeedsAvoidingPoolRematches(seeded, B).map((s) => s?.teamId ?? null);
   const rows: any[] = [];
   const push = async (round: number, index: number, t1: string | null, t2: string | null) => {
     const fmt = roundFormatFor(bracket, round, rounds);

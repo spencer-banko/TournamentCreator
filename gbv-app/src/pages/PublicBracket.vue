@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useToast } from 'primevue/usetoast';
@@ -52,11 +52,32 @@ const hasBracket = computed(() => {
   return !!t && (t.status === 'bracket' || t.status === 'completed' || !!t.bracket_generated_at);
 });
 
-const bracketChromeHidden = ref(false);
-const mobileBracketOffsetPx = computed(() => (bracketChromeHidden.value ? 110 : 200));
-function onBracketViewportScroll(pos: { left: number; top: number }) {
-  bracketChromeHidden.value = pos.left > 0 || pos.top > 0;
+/**
+ * On phones the bracket pans inside its own box. Size that box to the space left below the
+ * page header (measured, so the title / tabs / champion banner stay visible while panning).
+ */
+const bracketWrap = ref<HTMLElement | null>(null);
+const mobileBracketOffsetPx = ref(200);
+function measureBracketOffset() {
+  const el = bracketWrap.value;
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY;
+  // Keep at least ~320px of bracket visible on short screens; the page scrolls for the rest.
+  mobileBracketOffsetPx.value = Math.round(Math.min(top + 12, window.innerHeight - 320));
 }
+let bracketResizeObs: ResizeObserver | null = null;
+watch(bracketWrap, (el) => {
+  bracketResizeObs?.disconnect();
+  if (!el) return;
+  bracketResizeObs = new ResizeObserver(() => measureBracketOffset());
+  if (el.parentElement) bracketResizeObs.observe(el.parentElement);
+  measureBracketOffset();
+});
+onMounted(() => window.addEventListener('resize', measureBracketOffset));
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureBracketOffset);
+  bracketResizeObs?.disconnect();
+});
 
 const allMatches = ref<Match[]>([]);
 const brackets = ref<Bracket[]>([]);
@@ -276,10 +297,9 @@ onBeforeUnmount(async () => {
 <template>
   <PublicLayout>
     <section
-      class="px-5 sm:px-7 pb-2"
-      :class="bracketChromeHidden ? 'pt-2 sm:pt-3' : 'pt-5 sm:pt-7'"
+      class="px-5 sm:px-7 pb-2 pt-5 sm:pt-7"
     >
-      <div v-show="!bracketChromeHidden" class="mb-4 flex items-center gap-2 rounded-xl border border-ink/20 bg-ink/5 p-2">
+      <div class="mb-4 flex items-center gap-2 rounded-xl border border-ink/20 bg-ink/5 p-2">
         <router-link
           :to="{ name: 'public-pool-list', params: { accessCode } }"
           class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-ink/85 transition-colors hover:bg-ink/10"
@@ -293,7 +313,7 @@ onBeforeUnmount(async () => {
           Bracket
         </router-link>
       </div>
-      <div v-show="!bracketChromeHidden" class="flex items-center justify-between gap-3">
+      <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-2xl font-semibold text-ink">{{ tabs.length > 1 && selectedTab ? `${selectedTab.name} Bracket` : 'Bracket' }}</h2>
           <p class="mt-1 text-ink/80">
@@ -313,7 +333,6 @@ onBeforeUnmount(async () => {
 
       <nav
         v-if="tabs.length > 1"
-        v-show="!bracketChromeHidden"
         class="mt-4 flex gap-2 overflow-x-auto pb-1"
         role="tablist"
         aria-label="Brackets"
@@ -336,13 +355,13 @@ onBeforeUnmount(async () => {
       </nav>
 
       <div
-        v-if="championName && !bracketChromeHidden"
-        class="mt-4 rounded-2xl bg-ink/10 ring-2 ring-amber-300/60 p-5 text-center text-ink"
+        v-if="championName"
+        class="mt-3 sm:mt-4 rounded-2xl bg-ink/10 ring-2 ring-amber-300/60 px-4 py-2.5 sm:p-5 text-center text-ink"
       >
-        <div class="text-2xl sm:text-3xl font-extrabold leading-tight">
+        <div class="text-lg sm:text-3xl font-extrabold leading-tight">
           {{ championName }} WON{{ tabs.length > 1 && selectedTab ? ` ${selectedTab.name.toUpperCase()}` : '' }}!! 🎉🎉
         </div>
-        <div class="mt-1 text-ink/80 font-medium">
+        <div class="mt-0.5 sm:mt-1 text-sm sm:text-base text-ink/80 font-medium">
           Thank you for playing!
         </div>
       </div>
@@ -351,7 +370,7 @@ onBeforeUnmount(async () => {
         No bracket matches yet.
       </div>
 
-      <div v-else :class="bracketChromeHidden ? '' : 'mt-4'">
+      <div v-else ref="bracketWrap" class="mt-4">
         <div class="-mx-5 sm:-mx-7 -mb-10">
           <BracketView
             :matches="matches"
@@ -359,7 +378,6 @@ onBeforeUnmount(async () => {
             :courts="courts"
             :round-formats="roundFormats"
             :mobile-max-height-offset-px="mobileBracketOffsetPx"
-            @viewport-scroll="onBracketViewportScroll"
             @open="openMatchById"
           />
         </div>

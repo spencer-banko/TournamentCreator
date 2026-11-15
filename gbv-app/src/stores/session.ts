@@ -172,10 +172,23 @@ export const useSessionStore = defineStore('session', {
       return data as TournamentSummary[];
     },
 
-    async refreshAdminUser() {
+    /**
+     * Fast check from the locally stored session (no network round trip), so admin pages open
+     * instantly. The server is re-checked in the background; if the session was revoked the
+     * user is cleared and `onRevoked` runs. Database access is still enforced by RLS.
+     */
+    async refreshAdminUser(onRevoked?: () => void) {
       const { default: supabase } = await import('../lib/supabase');
-      const { data } = await supabase.auth.getUser();
-      this.adminUser = data.user ?? null;
+      const { data } = await supabase.auth.getSession();
+      this.adminUser = data.session?.user ?? null;
+      if (this.adminUser) {
+        supabase.auth.getUser().then(({ data: u, error }) => {
+          if (error?.status === 401 || error?.status === 403 || (!error && !u.user)) {
+            this.adminUser = null;
+            onRevoked?.();
+          }
+        });
+      }
       return this.adminUser;
     },
 
